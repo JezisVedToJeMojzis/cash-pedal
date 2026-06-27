@@ -30,8 +30,9 @@
 			<div>
 				<div style="font-size:1.25rem;font-weight:700">{user.name}</div>
 				<div class="muted" style="font-size:.85rem">
-					{user.companyName ? user.companyName : 'No company set'} · since {memberSince}
+					{user.companyName ? `🏢 ${user.companyName}` : 'No company set'}
 				</div>
+				<div class="muted" style="font-size:.8rem">Account created {memberSince}</div>
 			</div>
 		</div>
 

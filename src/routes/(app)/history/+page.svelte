@@ -1,9 +1,20 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
-	import { formatMoney, formatDistance, formatDuration, monthLabel } from '$lib/format';
+	import {
+		formatMoney,
+		formatDistance,
+		formatDuration,
+		formatSpeed,
+		monthLabel
+	} from '$lib/format';
 	let { data } = $props();
 
 	const justSaved = $derived(page.url.searchParams.get('saved'));
+
+	function confirmDelete(e: SubmitEvent) {
+		if (!confirm('Delete this ride? This cannot be undone.')) e.preventDefault();
+	}
 
 	function rideTime(d: string | Date) {
 		return new Date(d).toLocaleDateString(undefined, {
@@ -43,13 +54,20 @@
 				<div class="card">
 					{#each month.rides as ride}
 						<div class="list-row">
-							<div>
+							<div style="flex:1;min-width:0">
 								<div>{rideTime(ride.startedAt)}</div>
 								<div class="muted" style="font-size:.8rem">
-									{formatDistance(ride.distanceM)} · {formatDuration(ride.durationS)}
+									{formatDistance(ride.distanceM)} · {formatDuration(ride.durationS)} · {formatSpeed(
+										ride.distanceM,
+										ride.durationS
+									)}
 								</div>
 							</div>
 							<strong>{formatMoney(ride.earningsCents, data.currency)}</strong>
+							<form method="POST" action="?/delete" use:enhance onsubmit={confirmDelete}>
+								<input type="hidden" name="id" value={ride.id} />
+								<button type="submit" class="del-btn" aria-label="Delete ride" title="Delete ride">✕</button>
+							</form>
 						</div>
 					{/each}
 				</div>
@@ -57,3 +75,22 @@
 		{/each}
 	{/if}
 </div>
+
+<style>
+	.del-btn {
+		width: 34px;
+		height: 34px;
+		padding: 0;
+		flex-shrink: 0;
+		background: transparent;
+		border: 1px solid var(--border);
+		color: var(--text-muted);
+		font-size: 0.9rem;
+	}
+	.del-btn:hover {
+		filter: none;
+		background: var(--danger);
+		border-color: var(--danger);
+		color: #fff;
+	}
+</style>

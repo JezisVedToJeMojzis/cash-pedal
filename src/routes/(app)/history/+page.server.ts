@@ -1,8 +1,8 @@
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { rides } from '$lib/server/db/schema';
 import { monthKey } from '$lib/format';
-import type { PageServerLoad } from './$types';
+import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const user = locals.user!;
@@ -40,4 +40,14 @@ export const load: PageServerLoad = async ({ locals }) => {
 		totalRides: rows.length,
 		currency: user.currency
 	};
+};
+
+export const actions: Actions = {
+	// Delete one of the user's own rides (e.g. recorded by mistake).
+	delete: async ({ request, locals }) => {
+		const user = locals.user!;
+		const id = Number((await request.formData()).get('id'));
+		if (id) await db.delete(rides).where(and(eq(rides.id, id), eq(rides.userId, user.id)));
+		return { deleted: true };
+	}
 };

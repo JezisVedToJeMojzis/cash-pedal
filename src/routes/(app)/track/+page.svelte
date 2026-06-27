@@ -137,7 +137,7 @@
 		distanceM = 0;
 		elapsedS = 0;
 		activeMs = 0;
-		collapsed = false;
+		collapsed = true; // start minimised so the map stays the focus
 		startedAt = Date.now();
 		segmentStart = Date.now();
 		resuming = false;
@@ -243,6 +243,12 @@
 				<!-- Minimised: one compact row + controls, map stays visible -->
 				<div class="hud-compact">
 					<div class="hud-compact-stats">
+						<span
+							class="rec-dot"
+							class:paused={status === 'paused'}
+							class:searching={status === 'tracking' && !gpsReady}
+							title={status === 'paused' ? 'Paused' : gpsReady ? 'Recording' : 'Acquiring GPS…'}
+						></span>
 						<strong>{formatDistance(distanceM)}</strong>
 						<span class="muted">{formatDuration(elapsedS)}</span>
 						<strong style="color:var(--brand-bright)">{formatMoney(earningsCents, user.currency)}</strong>
@@ -382,6 +388,34 @@
 		text-align: left;
 		font-size: 1.05rem;
 		font-variant-numeric: tabular-nums;
+	}
+	/* Live recording indicator shown while minimised */
+	.rec-dot {
+		width: 10px;
+		height: 10px;
+		border-radius: 50%;
+		background: var(--brand-bright);
+		flex-shrink: 0;
+		animation: rec-pulse 1.4s ease-in-out infinite;
+	}
+	.rec-dot.searching {
+		background: var(--text-muted);
+		animation: none;
+	}
+	.rec-dot.paused {
+		background: var(--gold);
+		animation: none;
+	}
+	@keyframes rec-pulse {
+		0%,
+		100% {
+			opacity: 1;
+			box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5);
+		}
+		50% {
+			opacity: 0.6;
+			box-shadow: 0 0 0 6px rgba(34, 197, 94, 0);
+		}
 	}
 	.hud-compact-actions {
 		display: flex;
