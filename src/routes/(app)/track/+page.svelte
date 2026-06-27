@@ -21,6 +21,8 @@
 	let elapsedS = $state(0);
 	let error = $state('');
 	let gpsReady = $state(false);
+	let collapsed = $state(false); // minimise the stats panel to see more of the map
+	const activeRide = $derived(status === 'tracking' || status === 'paused');
 
 	let track: TrackPoint[] = [];
 	let startedAt = 0;
@@ -135,6 +137,7 @@
 		distanceM = 0;
 		elapsedS = 0;
 		activeMs = 0;
+		collapsed = false;
 		startedAt = Date.now();
 		segmentStart = Date.now();
 		resuming = false;
@@ -220,65 +223,101 @@
 	<div class="overlay">
 		{#if error}<p class="error" style="background:var(--bg-card);padding:.6rem;border-radius:10px">{error}</p>{/if}
 
-		<div class="card hud">
-			<div class="big-number">{formatMoney(earningsCents, user.currency)}</div>
-			<div class="muted" style="margin-top:.2rem">earned · {formatRate(user.rateCentsPerKm, user.currency)}</div>
+		<div class="card hud" class:collapsed>
+			{#if activeRide}
+				<button
+					class="hud-toggle"
+					onclick={() => (collapsed = !collapsed)}
+					aria-label={collapsed ? 'Expand stats' : 'Minimise stats'}
+					title={collapsed ? 'Expand stats' : 'Minimise to see the map'}
+				>
+					<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+						stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+						style="transform: rotate({collapsed ? 0 : 180}deg); transition: transform .2s">
+						<path d="M6 15l6-6 6 6" />
+					</svg>
+				</button>
+			{/if}
 
-			<div class="stat-grid" style="margin-top:.9rem">
-				<div class="stat">
-					<div class="value">{formatDistance(distanceM)}</div>
-					<div class="label">Distance</div>
-				</div>
-				<div class="stat">
-					<div class="value">{formatDuration(elapsedS)}</div>
-					<div class="label">Time</div>
-				</div>
-				<div class="stat">
-					<div class="value">{formatSpeed(distanceM, elapsedS)}</div>
-					<div class="label">Avg speed</div>
-				</div>
-				<div class="stat">
-					<div
-						class="value"
-						style="color:{status === 'paused'
-							? 'var(--gold)'
-							: gpsReady
-								? 'var(--brand-bright)'
-								: 'var(--text-muted)'}"
-					>
-						{status === 'paused'
-							? 'Paused'
-							: status === 'idle'
-								? '—'
-								: gpsReady
-									? 'GPS ✓'
-									: 'GPS…'}
+			{#if collapsed && activeRide}
+				<!-- Minimised: one compact row + controls, map stays visible -->
+				<div class="hud-compact">
+					<div class="hud-compact-stats">
+						<strong>{formatDistance(distanceM)}</strong>
+						<span class="muted">{formatDuration(elapsedS)}</span>
+						<strong style="color:var(--brand-bright)">{formatMoney(earningsCents, user.currency)}</strong>
+						{#if status === 'paused'}<span class="badge" style="color:var(--gold)">Paused</span>{/if}
 					</div>
-					<div class="label">{status === 'paused' ? 'Status' : 'Signal'}</div>
+					<div class="hud-compact-actions">
+						{#if status === 'tracking'}
+							<button class="btn-ghost icon-btn" onclick={pause} aria-label="Pause">⏸</button>
+						{:else}
+							<button class="icon-btn" onclick={resume} aria-label="Resume">▶</button>
+						{/if}
+						<button class="btn-danger icon-btn" onclick={stop} aria-label="Finish">■</button>
+					</div>
 				</div>
-			</div>
-
-			{#if status === 'idle'}
-				<button onclick={start} style="margin-top:.9rem">▶ Start ride</button>
-				{#if user.rateCentsPerKm === 0}
-					<p class="muted" style="text-align:center;margin:.6rem 0 0;font-size:.8rem">
-						Tip: set your €/km rate in <a href="/profile">Profile</a> to track earnings.
-					</p>
-				{/if}
-			{:else if status === 'tracking'}
-				<div class="btn-row" style="margin-top:.9rem">
-					<button class="btn-ghost" onclick={pause}>⏸ Pause</button>
-					<button class="btn-danger" onclick={stop}>■ Finish</button>
-				</div>
-				<button class="btn-text" onclick={cancel}>Discard ride</button>
-			{:else if status === 'paused'}
-				<div class="btn-row" style="margin-top:.9rem">
-					<button onclick={resume}>▶ Resume</button>
-					<button class="btn-danger" onclick={stop}>■ Finish</button>
-				</div>
-				<button class="btn-text" onclick={cancel}>Discard ride</button>
 			{:else}
-				<button disabled style="margin-top:.9rem">Saving…</button>
+				<!-- Maximised: full stats -->
+				<div class="big-number">{formatMoney(earningsCents, user.currency)}</div>
+				<div class="muted" style="margin-top:.2rem">earned · {formatRate(user.rateCentsPerKm, user.currency)}</div>
+
+				<div class="stat-grid" style="margin-top:.9rem">
+					<div class="stat">
+						<div class="value">{formatDistance(distanceM)}</div>
+						<div class="label">Distance</div>
+					</div>
+					<div class="stat">
+						<div class="value">{formatDuration(elapsedS)}</div>
+						<div class="label">Time</div>
+					</div>
+					<div class="stat">
+						<div class="value">{formatSpeed(distanceM, elapsedS)}</div>
+						<div class="label">Avg speed</div>
+					</div>
+					<div class="stat">
+						<div
+							class="value"
+							style="color:{status === 'paused'
+								? 'var(--gold)'
+								: gpsReady
+									? 'var(--brand-bright)'
+									: 'var(--text-muted)'}"
+						>
+							{status === 'paused'
+								? 'Paused'
+								: status === 'idle'
+									? '—'
+									: gpsReady
+										? 'GPS ✓'
+										: 'GPS…'}
+						</div>
+						<div class="label">{status === 'paused' ? 'Status' : 'Signal'}</div>
+					</div>
+				</div>
+
+				{#if status === 'idle'}
+					<button onclick={start} style="margin-top:.9rem">▶ Start ride</button>
+					{#if user.rateCentsPerKm === 0}
+						<p class="muted" style="text-align:center;margin:.6rem 0 0;font-size:.8rem">
+							Tip: set your €/km rate in <a href="/profile">Profile</a> to track earnings.
+						</p>
+					{/if}
+				{:else if status === 'tracking'}
+					<div class="btn-row" style="margin-top:.9rem">
+						<button class="btn-ghost" onclick={pause}>⏸ Pause</button>
+						<button class="btn-danger" onclick={stop}>■ Finish</button>
+					</div>
+					<button class="btn-text" onclick={cancel}>Discard ride</button>
+				{:else if status === 'paused'}
+					<div class="btn-row" style="margin-top:.9rem">
+						<button onclick={resume}>▶ Resume</button>
+						<button class="btn-danger" onclick={stop}>■ Finish</button>
+					</div>
+					<button class="btn-text" onclick={cancel}>Discard ride</button>
+				{:else}
+					<button disabled style="margin-top:.9rem">Saving…</button>
+				{/if}
 			{/if}
 		</div>
 	</div>
@@ -309,6 +348,50 @@
 		margin: 0 auto;
 		text-align: center;
 		box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+		transition: padding 0.15s ease;
+	}
+	.hud.collapsed {
+		padding: 0.55rem 0.85rem 0.7rem;
+	}
+	/* Minimise/maximise handle */
+	.hud-toggle {
+		width: 100%;
+		height: auto;
+		background: transparent;
+		border: none;
+		padding: 0 0 0.25rem;
+		margin: -0.35rem 0 0;
+		color: var(--text-muted);
+	}
+	.hud-toggle:hover {
+		filter: none;
+		color: var(--text);
+	}
+	/* Compact (minimised) layout */
+	.hud-compact {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.6rem;
+	}
+	.hud-compact-stats {
+		display: flex;
+		align-items: center;
+		gap: 0.55rem;
+		flex-wrap: wrap;
+		text-align: left;
+		font-size: 1.05rem;
+		font-variant-numeric: tabular-nums;
+	}
+	.hud-compact-actions {
+		display: flex;
+		gap: 0.4rem;
+		flex-shrink: 0;
+	}
+	.icon-btn {
+		width: auto;
+		padding: 0.55rem 0.85rem;
+		font-size: 1.05rem;
 	}
 	.btn-text {
 		margin-top: 0.5rem;
