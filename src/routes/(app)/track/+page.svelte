@@ -172,6 +172,8 @@
 	}
 
 	async function stop() {
+		// Guard against an accidental tap ending the ride.
+		if (!confirm('Finish and save this ride?')) return;
 		// Finalize active time if we're stopping mid-segment (not from a pause).
 		if (status === 'tracking') activeMs += Date.now() - segmentStart;
 		stopWatching();
