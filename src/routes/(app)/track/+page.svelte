@@ -219,6 +219,23 @@
 
 <svelte:head><title>Ride · CashPedal</title></svelte:head>
 
+{#snippet pauseIcon()}
+	<svg class="ctrl-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+		<rect x="6" y="5" width="4" height="14" rx="1.5" />
+		<rect x="14" y="5" width="4" height="14" rx="1.5" />
+	</svg>
+{/snippet}
+{#snippet playIcon()}
+	<svg class="ctrl-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+		<path d="M8 5.2v13.6a1 1 0 0 0 1.53.85l10.7-6.8a1 1 0 0 0 0-1.7L9.53 4.35A1 1 0 0 0 8 5.2Z" />
+	</svg>
+{/snippet}
+{#snippet stopIcon()}
+	<svg class="ctrl-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+		<rect x="6" y="6" width="12" height="12" rx="2.5" />
+	</svg>
+{/snippet}
+
 <div class="track-wrap">
 	<div class="map" bind:this={mapEl}></div>
 
@@ -258,11 +275,17 @@
 					</div>
 					<div class="hud-compact-actions">
 						{#if status === 'tracking'}
-							<button class="btn-ghost icon-btn" onclick={pause} aria-label="Pause">⏸</button>
+							<button class="btn-ghost icon-btn" onclick={pause} aria-label="Pause">
+								{@render pauseIcon()}
+							</button>
 						{:else}
-							<button class="icon-btn" onclick={resume} aria-label="Resume">▶</button>
+							<button class="icon-btn" onclick={resume} aria-label="Resume">
+								{@render playIcon()}
+							</button>
 						{/if}
-						<button class="btn-danger icon-btn" onclick={stop} aria-label="Finish">■</button>
+						<button class="btn-danger icon-btn" onclick={stop} aria-label="Finish">
+							{@render stopIcon()}
+						</button>
 					</div>
 				</div>
 			{:else}
@@ -305,7 +328,7 @@
 				</div>
 
 				{#if status === 'idle'}
-					<button onclick={start} style="margin-top:.9rem">▶ Start ride</button>
+					<button onclick={start} style="margin-top:.9rem">{@render playIcon()} Start ride</button>
 					{#if user.rateCentsPerKm === 0}
 						<p class="muted" style="text-align:center;margin:.6rem 0 0;font-size:.8rem">
 							Tip: set your €/km rate in <a href="/profile">Profile</a> to track earnings.
@@ -313,14 +336,14 @@
 					{/if}
 				{:else if status === 'tracking'}
 					<div class="btn-row" style="margin-top:.9rem">
-						<button class="btn-ghost" onclick={pause}>⏸ Pause</button>
-						<button class="btn-danger" onclick={stop}>■ Finish</button>
+						<button class="btn-ghost" onclick={pause}>{@render pauseIcon()} Pause</button>
+						<button class="btn-danger" onclick={stop}>{@render stopIcon()} Finish</button>
 					</div>
 					<button class="btn-text" onclick={cancel}>Discard ride</button>
 				{:else if status === 'paused'}
 					<div class="btn-row" style="margin-top:.9rem">
-						<button onclick={resume}>▶ Resume</button>
-						<button class="btn-danger" onclick={stop}>■ Finish</button>
+						<button onclick={resume}>{@render playIcon()} Resume</button>
+						<button class="btn-danger" onclick={stop}>{@render stopIcon()} Finish</button>
 					</div>
 					<button class="btn-text" onclick={cancel}>Discard ride</button>
 				{:else}
@@ -426,8 +449,17 @@
 	}
 	.icon-btn {
 		width: auto;
-		padding: 0.55rem 0.85rem;
-		font-size: 1.05rem;
+		padding: 0.5rem 0.9rem;
+	}
+	.ctrl-icon {
+		width: 18px;
+		height: 18px;
+		display: block;
+		flex-shrink: 0;
+	}
+	.icon-btn .ctrl-icon {
+		width: 20px;
+		height: 20px;
 	}
 	.btn-text {
 		margin-top: 0.5rem;
