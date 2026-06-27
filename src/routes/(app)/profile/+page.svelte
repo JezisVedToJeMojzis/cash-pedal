@@ -17,6 +17,12 @@
 	function msg(section: string) {
 		return form?.section === section ? form : null;
 	}
+
+	let tab = $state<'settings' | 'history'>('settings');
+	// If a form action returns a message, make sure we're on the Settings tab to show it.
+	$effect(() => {
+		if (form?.section) tab = 'settings';
+	});
 </script>
 
 <svelte:head><title>Profile · CashPedal</title></svelte:head>
@@ -54,26 +60,33 @@
 		</div>
 	</div>
 
-	<!-- Monthly history -->
-	<div class="card">
-		<h2>Monthly history</h2>
-		{#if data.monthly.length === 0}
-			<p class="muted">No rides yet.</p>
-		{:else}
-			{#each data.monthly as m}
-				<div class="list-row">
-					<div>
-						<div>{monthLabel(m.key)}</div>
-						<div class="muted" style="font-size:.8rem">
-							{formatDistance(m.distanceM)} · {m.rideCount} ride{m.rideCount === 1 ? '' : 's'}
-						</div>
-					</div>
-					<strong style="color:var(--brand-bright)">{formatMoney(m.earningsCents, user.currency)}</strong>
-				</div>
-			{/each}
-		{/if}
+	<!-- Tabs: Settings vs History -->
+	<div class="btn-row" style="margin:1rem 0">
+		<button class:btn-ghost={tab !== 'settings'} onclick={() => (tab = 'settings')}>Settings</button>
+		<button class:btn-ghost={tab !== 'history'} onclick={() => (tab = 'history')}>History</button>
 	</div>
 
+	{#if tab === 'history'}
+		<!-- Monthly history -->
+		<div class="card">
+			<h2>Monthly history</h2>
+			{#if data.monthly.length === 0}
+				<p class="muted">No rides yet.</p>
+			{:else}
+				{#each data.monthly as m}
+					<div class="list-row">
+						<div>
+							<div>{monthLabel(m.key)}</div>
+							<div class="muted" style="font-size:.8rem">
+								{formatDistance(m.distanceM)} · {m.rideCount} ride{m.rideCount === 1 ? '' : 's'}
+							</div>
+						</div>
+						<strong style="color:var(--brand-bright)">{formatMoney(m.earningsCents, user.currency)}</strong>
+					</div>
+				{/each}
+			{/if}
+		</div>
+	{:else}
 	<!-- Compensation settings -->
 	<div class="card">
 		<h2>Compensation</h2>
@@ -135,9 +148,10 @@
 		</form>
 	</div>
 
-	<form method="POST" action="?/logout" use:enhance style="margin-top:.75rem">
-		<button class="btn-ghost" type="submit">Log out</button>
-	</form>
+		<form method="POST" action="?/logout" use:enhance style="margin-top:.75rem">
+			<button class="btn-ghost" type="submit">Log out</button>
+		</form>
+	{/if}
 </div>
 
 <style>

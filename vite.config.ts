@@ -15,13 +15,22 @@ export default defineConfig({
 		}),
 		SvelteKitPWA({
 			registerType: 'autoUpdate',
+			// Serve the manifest + service worker on the dev server too, so the app
+			// is installable (standalone) when testing locally, not just in prod.
+			devOptions: {
+				enabled: true,
+				type: 'module',
+				suppressWarnings: true
+			},
 			manifest: {
+				id: '/',
 				name: 'CashPedal — Bike Commute Tracker',
 				short_name: 'CashPedal',
 				description: 'Track your bike commutes and the compensation you earn per kilometre.',
 				theme_color: '#16a34a',
 				background_color: '#0f172a',
 				display: 'standalone',
+				display_override: ['standalone'],
 				orientation: 'portrait',
 				start_url: '/',
 				scope: '/',
