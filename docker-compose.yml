@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: pedal-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pedal
+      POSTGRES_PASSWORD: pedal
+      POSTGRES_DB: pedal
+    ports:
+      - '5433:5432'
+    volumes:
+      - pedal_pgdata:/var/lib/postgresql/data
+
+volumes:
+  pedal_pgdata:

@@ -1,0 +1,12 @@
+node_modules
+.svelte-kit
+build
+.git
+.env
+.env.*
+!.env.example
+*.log
+dev.log
+.DS_Store
+Thumbs.db
+.vscode

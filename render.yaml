@@ -1,0 +1,21 @@
+# Render Blueprint: single Docker web service (SvelteKit adapter-node).
+# Create the Postgres database separately (e.g. Neon) and paste its connection
+# string into DATABASE_URL in the Render dashboard. Render injects PORT.
+services:
+  - type: web
+    name: cashpedal
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false # set in dashboard — Neon connection string with ?sslmode=require
+      - key: COOKIE_SECURE
+        value: 'true'
+      # Trust Render's proxy headers so adapter-node derives the public https
+      # origin (required for secure cookies + SvelteKit CSRF on form POSTs).
+      - key: PROTOCOL_HEADER
+        value: x-forwarded-proto
+      - key: HOST_HEADER
+        value: x-forwarded-host

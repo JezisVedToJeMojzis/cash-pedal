@@ -1,0 +1,327 @@
+<script lang="ts">
+	import { onMount, onDestroy } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
+	import { haversine } from '$lib/geo';
+	import {
+		computeEarningsCents,
+		formatMoney,
+		formatDistance,
+		formatDuration,
+		formatSpeed,
+		formatRate
+	} from '$lib/format';
+	import type { TrackPoint } from '$lib/server/db/schema';
+
+	const user = $derived(page.data.user!);
+
+	type Status = 'idle' | 'tracking' | 'paused' | 'saving';
+	let status = $state<Status>('idle');
+	let distanceM = $state(0);
+	let elapsedS = $state(0);
+	let error = $state('');
+	let gpsReady = $state(false);
+
+	let track: TrackPoint[] = [];
+	let startedAt = 0;
+	// Active (un-paused) time accounting.
+	let activeMs = 0; // accumulated time from completed segments
+	let segmentStart = 0; // when the current active segment began
+	let resuming = false; // skip distance on the first fix after a resume
+	let watchId: number | null = null;
+	let timer: ReturnType<typeof setInterval> | null = null;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	let wakeLock: any = null;
+
+	const earningsCents = $derived(computeEarningsCents(distanceM, user.rateCentsPerKm));
+
+	// --- Leaflet (loaded client-side only) ---
+	let mapEl: HTMLDivElement;
+	let map: import('leaflet').Map | null = null;
+	let L: typeof import('leaflet') | null = null;
+	let line: import('leaflet').Polyline | null = null;
+	let marker: import('leaflet').CircleMarker | null = null;
+
+	onMount(async () => {
+		const leaflet = await import('leaflet');
+		await import('leaflet/dist/leaflet.css');
+		L = leaflet.default ?? leaflet;
+		map = L.map(mapEl, { zoomControl: false, attributionControl: false }).setView([48.2, 16.37], 13);
+		L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+		// Centre on the user's current position if we can get one cheaply.
+		navigator.geolocation?.getCurrentPosition(
+			(pos) => map?.setView([pos.coords.latitude, pos.coords.longitude], 16),
+			() => {},
+			{ enableHighAccuracy: false, timeout: 8000 }
+		);
+	});
+
+	onDestroy(() => stopWatching());
+
+	function onPosition(pos: GeolocationPosition) {
+		gpsReady = true;
+		const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+		if (accuracy > 50) return; // too noisy, skip
+		// First fix after a resume: re-anchor here without counting the gap.
+		if (resuming) {
+			resuming = false;
+			track.push([lat, lng, Date.now()]);
+			drawRoute(lat, lng);
+			return;
+		}
+		const last = track[track.length - 1];
+		if (last) {
+			const step = haversine(last[0], last[1], lat, lng);
+			if (step < 4) return; // jitter while ~stationary
+			distanceM += step;
+		}
+		track.push([lat, lng, Date.now()]);
+		drawRoute(lat, lng);
+	}
+
+	function drawRoute(lat: number, lng: number) {
+		if (!L || !map) return;
+		const latlngs = track.map((p) => [p[0], p[1]] as [number, number]);
+		if (!line) {
+			line = L.polyline(latlngs, { color: '#22c55e', weight: 6, opacity: 0.9 }).addTo(map);
+		} else {
+			line.setLatLngs(latlngs);
+		}
+		if (!marker) {
+			marker = L.circleMarker([lat, lng], {
+				radius: 8,
+				color: '#fff',
+				weight: 3,
+				fillColor: '#16a34a',
+				fillOpacity: 1
+			}).addTo(map);
+		} else {
+			marker.setLatLng([lat, lng]);
+		}
+		map.setView([lat, lng], Math.max(map.getZoom(), 16));
+	}
+
+	async function acquireWakeLock() {
+		try {
+			wakeLock = await navigator.wakeLock?.request('screen');
+		} catch {
+			/* ignore */
+		}
+	}
+
+	function startWatch() {
+		watchId = navigator.geolocation.watchPosition(
+			onPosition,
+			(err) => {
+				error =
+					err.code === err.PERMISSION_DENIED
+						? 'Location permission denied. Enable it to track your ride.'
+						: 'Could not get your location. Make sure GPS is on.';
+			},
+			{ enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 }
+		);
+		timer = setInterval(() => {
+			elapsedS = Math.round((activeMs + (Date.now() - segmentStart)) / 1000);
+		}, 1000);
+	}
+
+	async function start() {
+		error = '';
+		if (!navigator.geolocation) {
+			error = 'Geolocation is not available on this device.';
+			return;
+		}
+		track = [];
+		distanceM = 0;
+		elapsedS = 0;
+		activeMs = 0;
+		startedAt = Date.now();
+		segmentStart = Date.now();
+		resuming = false;
+		status = 'tracking';
+		await acquireWakeLock();
+		startWatch();
+	}
+
+	function pause() {
+		// Bank the time spent in this segment, then stop sensors/timer.
+		activeMs += Date.now() - segmentStart;
+		elapsedS = Math.round(activeMs / 1000);
+		stopWatching();
+		status = 'paused';
+	}
+
+	async function resume() {
+		segmentStart = Date.now();
+		resuming = true; // don't count the gap travelled while paused
+		status = 'tracking';
+		await acquireWakeLock();
+		startWatch();
+	}
+
+	function stopWatching() {
+		if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+		watchId = null;
+		if (timer) clearInterval(timer);
+		timer = null;
+		wakeLock?.release().catch(() => {});
+		wakeLock = null;
+	}
+
+	async function stop() {
+		// Finalize active time if we're stopping mid-segment (not from a pause).
+		if (status === 'tracking') activeMs += Date.now() - segmentStart;
+		stopWatching();
+		status = 'saving';
+		try {
+			const res = await fetch('/api/rides', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					startedAt: new Date(startedAt).toISOString(),
+					endedAt: new Date().toISOString(),
+					durationS: Math.round(activeMs / 1000),
+					track
+				})
+			});
+			if (!res.ok) throw new Error(await res.text());
+			const ride = await res.json();
+			await goto(`/history?saved=${ride.id}`);
+		} catch (e) {
+			error = 'Could not save the ride. ' + (e instanceof Error ? e.message : '');
+			status = 'idle';
+		}
+	}
+
+	function cancel() {
+		stopWatching();
+		status = 'idle';
+		distanceM = 0;
+		elapsedS = 0;
+		activeMs = 0;
+		resuming = false;
+		track = [];
+		if (line) {
+			line.remove();
+			line = null;
+		}
+		if (marker) {
+			marker.remove();
+			marker = null;
+		}
+	}
+</script>
+
+<svelte:head><title>Ride · CashPedal</title></svelte:head>
+
+<div class="track-wrap">
+	<div class="map" bind:this={mapEl}></div>
+
+	<div class="overlay">
+		{#if error}<p class="error" style="background:var(--bg-card);padding:.6rem;border-radius:10px">{error}</p>{/if}
+
+		<div class="card hud">
+			<div class="big-number">{formatMoney(earningsCents, user.currency)}</div>
+			<div class="muted" style="margin-top:.2rem">earned · {formatRate(user.rateCentsPerKm, user.currency)}</div>
+
+			<div class="stat-grid" style="margin-top:.9rem">
+				<div class="stat">
+					<div class="value">{formatDistance(distanceM)}</div>
+					<div class="label">Distance</div>
+				</div>
+				<div class="stat">
+					<div class="value">{formatDuration(elapsedS)}</div>
+					<div class="label">Time</div>
+				</div>
+				<div class="stat">
+					<div class="value">{formatSpeed(distanceM, elapsedS)}</div>
+					<div class="label">Avg speed</div>
+				</div>
+				<div class="stat">
+					<div
+						class="value"
+						style="color:{status === 'paused'
+							? 'var(--gold)'
+							: gpsReady
+								? 'var(--brand-bright)'
+								: 'var(--text-muted)'}"
+					>
+						{status === 'paused'
+							? 'Paused'
+							: status === 'idle'
+								? '—'
+								: gpsReady
+									? 'GPS ✓'
+									: 'GPS…'}
+					</div>
+					<div class="label">{status === 'paused' ? 'Status' : 'Signal'}</div>
+				</div>
+			</div>
+
+			{#if status === 'idle'}
+				<button onclick={start} style="margin-top:.9rem">▶ Start ride</button>
+				{#if user.rateCentsPerKm === 0}
+					<p class="muted" style="text-align:center;margin:.6rem 0 0;font-size:.8rem">
+						Tip: set your €/km rate in <a href="/profile">Profile</a> to track earnings.
+					</p>
+				{/if}
+			{:else if status === 'tracking'}
+				<div class="btn-row" style="margin-top:.9rem">
+					<button class="btn-ghost" onclick={pause}>⏸ Pause</button>
+					<button class="btn-danger" onclick={stop}>■ Finish</button>
+				</div>
+				<button class="btn-text" onclick={cancel}>Discard ride</button>
+			{:else if status === 'paused'}
+				<div class="btn-row" style="margin-top:.9rem">
+					<button onclick={resume}>▶ Resume</button>
+					<button class="btn-danger" onclick={stop}>■ Finish</button>
+				</div>
+				<button class="btn-text" onclick={cancel}>Discard ride</button>
+			{:else}
+				<button disabled style="margin-top:.9rem">Saving…</button>
+			{/if}
+		</div>
+	</div>
+</div>
+
+<style>
+	.track-wrap {
+		position: fixed;
+		inset: 0;
+		bottom: calc(var(--nav-h) + var(--safe-bottom));
+	}
+	.map {
+		position: absolute;
+		inset: 0;
+		background: var(--bg-soft);
+		z-index: 0;
+	}
+	.overlay {
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		padding: 0.75rem;
+		z-index: 500;
+	}
+	.hud {
+		max-width: 560px;
+		margin: 0 auto;
+		text-align: center;
+		box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+	}
+	.btn-text {
+		margin-top: 0.5rem;
+		background: transparent;
+		border: none;
+		color: var(--text-muted);
+		font-size: 0.85rem;
+	}
+	.btn-text:hover {
+		filter: none;
+		color: var(--danger);
+	}
+	:global(.leaflet-container) {
+		font-family: inherit;
+	}
+</style>
