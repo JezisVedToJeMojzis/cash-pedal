@@ -13,6 +13,19 @@
 
 	const justSaved = $derived(page.url.searchParams.get('saved'));
 
+	let view = $state<'month' | 'all'>('month');
+
+	const currentTotal = $derived(
+		data.currentRides.reduce(
+			(acc, r) => {
+				acc.distanceM += r.distanceM;
+				acc.earningsCents += r.earningsCents;
+				return acc;
+			},
+			{ distanceM: 0, earningsCents: 0 }
+		)
+	);
+
 	let showDelete = $state(false);
 	let pendingDeleteId = $state<number | null>(null);
 	let deleteForm: HTMLFormElement;
@@ -41,23 +54,34 @@
 		<p class="success">✓ Ride saved! Nice work.</p>
 	{/if}
 
-	{#if data.months.length === 0}
+	{#if data.monthly.length === 0}
 		<div class="card" style="text-align:center">
 			<p class="muted">No rides yet.</p>
 			<a class="btn" href="/track" style="margin-top:.5rem">Start your first ride</a>
 		</div>
 	{:else}
-		{#each data.months as month}
-			<section style="margin-top:1.25rem">
-				<div style="display:flex;justify-content:space-between;align-items:baseline">
-					<h2 style="margin:0">{monthLabel(month.key)}</h2>
-					<strong style="color:var(--brand-bright)">{formatMoney(month.earningsCents, data.currency)}</strong>
-				</div>
-				<p class="muted" style="margin:.1rem 0 .6rem;font-size:.85rem">
-					{formatDistance(month.distanceM)} · {month.rides.length} ride{month.rides.length === 1 ? '' : 's'}
+		<div class="btn-row" style="margin:.5rem 0 1rem">
+			<button class:btn-ghost={view !== 'month'} onclick={() => (view = 'month')}>This month</button>
+			<button class:btn-ghost={view !== 'all'} onclick={() => (view = 'all')}>All months</button>
+		</div>
+
+		{#if view === 'month'}
+			<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.5rem">
+				<h2 style="margin:0">{monthLabel(data.currentKey)}</h2>
+				<strong style="color:var(--brand-bright)">{formatMoney(currentTotal.earningsCents, data.currency)}</strong>
+			</div>
+
+			{#if data.currentRides.length === 0}
+				<div class="card"><p class="muted" style="margin:0">No rides this month yet.</p></div>
+			{:else}
+				<p class="muted" style="margin:0 0 .6rem;font-size:.85rem">
+					{formatDistance(currentTotal.distanceM)} · {data.currentRides.length} ride{data.currentRides
+						.length === 1
+						? ''
+						: 's'}
 				</p>
 				<div class="card">
-					{#each month.rides as ride}
+					{#each data.currentRides as ride}
 						<div class="list-row">
 							<div style="flex:1;min-width:0">
 								<div>{rideTime(ride.startedAt)}</div>
@@ -84,8 +108,26 @@
 						</div>
 					{/each}
 				</div>
-			</section>
-		{/each}
+			{/if}
+		{:else}
+			<!-- All months: combined totals per month -->
+			<div class="card">
+				{#each data.monthly as m}
+					<div class="list-row">
+						<div style="flex:1;min-width:0">
+							<div>
+								{monthLabel(m.key)}
+								{#if m.key === data.currentKey}<span class="badge">current</span>{/if}
+							</div>
+							<div class="muted" style="font-size:.8rem">
+								{formatDistance(m.distanceM)} · {m.rideCount} ride{m.rideCount === 1 ? '' : 's'}
+							</div>
+						</div>
+						<strong style="color:var(--brand-bright)">{formatMoney(m.earningsCents, data.currency)}</strong>
+					</div>
+				{/each}
+			</div>
+		{/if}
 	{/if}
 </div>
 
@@ -120,7 +162,6 @@
 		background: transparent;
 		border: 1px solid var(--border);
 		color: var(--text-muted);
-		font-size: 0.9rem;
 	}
 	.del-btn:hover {
 		filter: none;

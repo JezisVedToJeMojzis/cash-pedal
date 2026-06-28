@@ -10,7 +10,6 @@ import {
 	verifyPassword
 } from '$lib/server/auth';
 import { resolveCompanyByName } from '$lib/server/companies';
-import { getMonthlyTotals } from '$lib/server/stats';
 import type { Actions, PageServerLoad } from './$types';
 
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'CZK', 'PLN', 'CHF', 'SEK', 'NOK', 'DKK'];
@@ -28,8 +27,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	return {
 		currencies: CURRENCIES,
-		totals: agg,
-		monthly: await getMonthlyTotals(user.id)
+		totals: agg
 	};
 };
 

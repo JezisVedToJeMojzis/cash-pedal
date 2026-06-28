@@ -18,26 +18,29 @@ export const load: PageServerLoad = async ({ locals }) => {
 		.where(eq(rides.userId, user.id))
 		.orderBy(desc(rides.startedAt));
 
-	// Group rides by calendar month with running totals.
-	const months = new Map<
-		string,
-		{ key: string; distanceM: number; earningsCents: number; rides: typeof rows }
-	>();
+	const currentKey = monthKey(new Date());
+
+	// This month: each ride individually.
+	const currentRides = rows.filter((r) => monthKey(new Date(r.startedAt)) === currentKey);
+
+	// All months: combined totals per month (newest first).
+	const totals = new Map<string, { key: string; distanceM: number; earningsCents: number; rideCount: number }>();
 	for (const r of rows) {
 		const key = monthKey(new Date(r.startedAt));
-		let m = months.get(key);
+		let m = totals.get(key);
 		if (!m) {
-			m = { key, distanceM: 0, earningsCents: 0, rides: [] };
-			months.set(key, m);
+			m = { key, distanceM: 0, earningsCents: 0, rideCount: 0 };
+			totals.set(key, m);
 		}
 		m.distanceM += r.distanceM;
 		m.earningsCents += r.earningsCents;
-		m.rides.push(r);
+		m.rideCount += 1;
 	}
 
 	return {
-		months: [...months.values()],
-		totalRides: rows.length,
+		currentKey,
+		currentRides,
+		monthly: [...totals.values()],
 		currency: user.currency
 	};
 };

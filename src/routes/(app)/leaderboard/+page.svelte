@@ -63,29 +63,29 @@
 					<div style="flex:1;min-width:0">
 						<div>
 							{entry.name}
-							{#if entry.userId === data.meId}<span class="badge">you</span>{/if}
+							{#if entry.userId === data.meId}
+								<span class="badge">you</span>
+							{:else if scope === 'company' && relationOf(entry) === 'friend'}
+								<span class="badge">friend</span>
+							{:else if scope === 'company' && relationOf(entry) === 'pending'}
+								<span class="badge">requested</span>
+							{/if}
 						</div>
 						<div class="muted" style="font-size:.8rem">
 							{entry.rideCount} ride{entry.rideCount === 1 ? '' : 's'}
 						</div>
 					</div>
 
-					{#if scope === 'company'}
-						{#if relationOf(entry) === 'none'}
-							<form method="POST" action="?/add" use:enhance>
-								<input type="hidden" name="userId" value={entry.userId} />
-								<button type="submit" class="btn-ghost add-btn">+ Add</button>
-							</form>
-						{:else if relationOf(entry) === 'pending'}
-							<span class="badge">requested</span>
-						{:else if relationOf(entry) === 'friend'}
-							<span class="badge">friend</span>
-						{/if}
+					{#if scope === 'company' && relationOf(entry) === 'none'}
+						<form method="POST" action="?/add" use:enhance>
+							<input type="hidden" name="userId" value={entry.userId} />
+							<button type="submit" class="btn-ghost add-btn">+ Add</button>
+						</form>
 					{/if}
 
 					<div style="text-align:right">
 						{#if sortBy === 'earnings'}
-							<div class="primary money">{formatMoney(entry.earningsCents, entry.currency)}</div>
+							<div class="primary">{formatMoney(entry.earningsCents, entry.currency)}</div>
 							<div class="secondary">{formatDistance(entry.distanceM)}</div>
 						{:else}
 							<div class="primary">{formatDistance(entry.distanceM)}</div>
@@ -146,8 +146,6 @@
 	.primary {
 		font-weight: 800;
 		line-height: 1.15;
-	}
-	.primary.money {
 		color: var(--brand-bright);
 	}
 	.secondary {
