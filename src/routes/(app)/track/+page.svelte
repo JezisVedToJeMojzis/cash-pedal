@@ -376,7 +376,7 @@
 	.track-wrap {
 		position: fixed;
 		inset: 0;
-		bottom: calc(var(--nav-h) + var(--safe-bottom));
+		bottom: calc(var(--nav-h) + min(var(--safe-bottom), 0.4rem));
 	}
 	.map {
 		position: absolute;

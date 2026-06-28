@@ -56,7 +56,7 @@ a {
 .page {
 	max-width: 560px;
 	margin: 0 auto;
-	padding: calc(1rem + var(--safe-top)) 1rem calc(var(--nav-h) + var(--safe-bottom) + 1rem);
+	padding: calc(1rem + var(--safe-top)) 1rem calc(var(--nav-h) + min(var(--safe-bottom), 0.4rem) + 1rem);
 }
 
 .card {
@@ -220,8 +220,10 @@ select:focus {
 	bottom: 0;
 	left: 0;
 	right: 0;
-	height: calc(var(--nav-h) + var(--safe-bottom));
-	padding-bottom: var(--safe-bottom);
+	/* Cap the home-indicator inset so a large safe-area value doesn't leave a
+	   big empty strip below the menu — keep just a small buffer. */
+	height: calc(var(--nav-h) + min(var(--safe-bottom), 0.4rem));
+	padding-bottom: min(var(--safe-bottom), 0.4rem);
 	display: flex;
 	background: rgba(15, 23, 42, 0.95);
 	backdrop-filter: blur(10px);
