@@ -7,22 +7,32 @@ import type { Actions, PageServerLoad } from './$types';
 export const load: PageServerLoad = async ({ locals }) => {
 	const me = locals.user!;
 
+	const otherIdExpr = sql`case when ${friendships.requesterId} = ${me.id} then ${friendships.addresseeId} else ${friendships.requesterId} end`;
+
 	const rows = await db
 		.select({
 			id: friendships.id,
 			status: friendships.status,
 			requesterId: friendships.requesterId,
 			addresseeId: friendships.addresseeId,
-			otherId: sql<number>`case when ${friendships.requesterId} = ${me.id} then ${friendships.addresseeId} else ${friendships.requesterId} end`,
-			otherName: sql<string>`(select name from users u where u.id = case when ${friendships.requesterId} = ${me.id} then ${friendships.addresseeId} else ${friendships.requesterId} end)`
+			createdAt: friendships.createdAt,
+			otherId: sql<number>`${otherIdExpr}`,
+			otherName: sql<string>`(select name from users u where u.id = ${otherIdExpr})`,
+			otherCompanyId: sql<number | null>`(select company_id from users u where u.id = ${otherIdExpr})`
 		})
 		.from(friendships)
 		.where(or(eq(friendships.requesterId, me.id), eq(friendships.addresseeId, me.id)));
 
+	// A friend is a "coworker" if we share the same (non-null) company.
+	const withCoworker = rows.map((r) => ({
+		...r,
+		coworker: me.companyId != null && r.otherCompanyId === me.companyId
+	}));
+
 	return {
-		friends: rows.filter((r) => r.status === 'accepted'),
-		incoming: rows.filter((r) => r.status === 'pending' && r.addresseeId === me.id),
-		outgoing: rows.filter((r) => r.status === 'pending' && r.requesterId === me.id)
+		friends: withCoworker.filter((r) => r.status === 'accepted'),
+		incoming: withCoworker.filter((r) => r.status === 'pending' && r.addresseeId === me.id),
+		outgoing: withCoworker.filter((r) => r.status === 'pending' && r.requesterId === me.id)
 	};
 };
 

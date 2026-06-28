@@ -18,9 +18,12 @@
 	function rankClass(i: number) {
 		return i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
 	}
-	// Narrow the relation field, present only on company-scope entries.
+	// Narrow optional fields present only on certain scopes.
 	function relationOf(e: unknown): string | undefined {
 		return (e as { relation?: string }).relation;
+	}
+	function isCoworker(e: unknown): boolean {
+		return (e as { coworker?: boolean }).coworker === true;
 	}
 </script>
 
@@ -65,6 +68,8 @@
 							{entry.name}
 							{#if entry.userId === data.meId}
 								<span class="badge">you</span>
+							{:else if scope === 'friends' && isCoworker(entry)}
+								<span class="badge">coworker</span>
 							{:else if scope === 'company' && relationOf(entry) === 'friend'}
 								<span class="badge">friend</span>
 							{:else if scope === 'company' && relationOf(entry) === 'pending'}

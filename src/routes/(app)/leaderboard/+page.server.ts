@@ -12,10 +12,11 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	// Friends scope: me + accepted friends.
 	const friendIds = await getAcceptedFriendIds(me.id);
-	const friends = await getLeaderboard([me.id, ...friendIds], start, end);
+	const friendsBoard = await getLeaderboard([me.id, ...friendIds], start, end);
 
 	// Company scope: everyone sharing my company, annotated with my relationship
 	// to them so the board can offer an "Add friend" button.
+	let coworkerIds = new Set<number>();
 	let company = null;
 	let companyName: string | null = null;
 	if (me.companyId) {
@@ -30,6 +31,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			.select({ id: users.id })
 			.from(users)
 			.where(eq(users.companyId, me.companyId));
+		coworkerIds = new Set(colleagues.map((u) => u.id));
 		const board = await getLeaderboard(
 			colleagues.map((u) => u.id),
 			start,
@@ -61,6 +63,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 							: 'none'
 		}));
 	}
+
+	// Friends board: flag which friends are also coworkers (share my company).
+	const friends = friendsBoard.map((e) => ({ ...e, coworker: coworkerIds.has(e.userId) }));
 
 	return { month: key, meId: me.id, friends, company, companyName };
 };

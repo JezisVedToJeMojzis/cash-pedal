@@ -12,6 +12,8 @@
 	}
 
 	const initial = (n: string) => n.charAt(0).toUpperCase();
+	const added = (d: string | Date) =>
+		new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 </script>
 
 <svelte:head><title>Friends · CashPedal</title></svelte:head>
@@ -37,7 +39,10 @@
 		{#each data.incoming as r}
 			<div class="friend-row">
 				<div class="avatar-sm">{initial(r.otherName)}</div>
-				<span class="friend-name">{r.otherName}</span>
+				<span class="friend-name">
+					{r.otherName}
+					{#if r.coworker}<span class="badge">coworker</span>{/if}
+				</span>
 				<div class="btn-row" style="width:auto;gap:.4rem">
 					<form method="POST" action="?/accept" use:enhance>
 						<input type="hidden" name="id" value={r.id} />
@@ -59,7 +64,13 @@
 		{#each data.friends as f}
 			<div class="friend-row">
 				<div class="avatar-sm">{initial(f.otherName)}</div>
-				<span class="friend-name">{f.otherName}</span>
+				<div class="friend-meta">
+					<div class="friend-name">
+						{f.otherName}
+						{#if f.coworker}<span class="badge">coworker</span>{/if}
+					</div>
+					<div class="friend-sub muted">Added {added(f.createdAt)}</div>
+				</div>
 				<button class="btn-ghost row-btn" onclick={() => openRemove(f.id, f.otherName)}>Remove</button>
 			</div>
 		{/each}
@@ -70,7 +81,10 @@
 		{#each data.outgoing as r}
 			<div class="friend-row">
 				<div class="avatar-sm">{initial(r.otherName)}</div>
-				<span class="friend-name">{r.otherName} <span class="badge">pending</span></span>
+				<span class="friend-name">
+					{r.otherName} <span class="badge">pending</span>
+					{#if r.coworker}<span class="badge">coworker</span>{/if}
+				</span>
 				<form method="POST" action="?/remove" use:enhance>
 					<input type="hidden" name="id" value={r.id} />
 					<button type="submit" class="btn-ghost row-btn">Cancel</button>
@@ -120,6 +134,10 @@
 		font-weight: 800;
 		flex-shrink: 0;
 	}
+	.friend-meta {
+		flex: 1;
+		min-width: 0;
+	}
 	.friend-name {
 		flex: 1;
 		min-width: 0;
@@ -127,6 +145,10 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+	.friend-sub {
+		font-size: 0.78rem;
+		margin-top: 0.1rem;
 	}
 	.row-btn {
 		width: auto;
