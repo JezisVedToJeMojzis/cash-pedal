@@ -6,6 +6,7 @@ import {
 	doublePrecision,
 	timestamp,
 	jsonb,
+	boolean,
 	uniqueIndex,
 	index
 } from 'drizzle-orm/pg-core';
@@ -64,6 +65,8 @@ export const rides = pgTable('rides', {
 	earningsCents: integer('earnings_cents').notNull().default(0),
 	/** Recorded GPS track for drawing the route polyline. */
 	track: jsonb('track').$type<TrackPoint[]>().notNull().default([]),
+	/** True if the user entered this ride by hand (no GPS recording). */
+	manual: boolean('manual').notNull().default(false),
 	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 }, (t) => [
 	index('rides_user_started_idx').on(t.userId, t.startedAt)
