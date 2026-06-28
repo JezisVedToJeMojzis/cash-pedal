@@ -5,7 +5,17 @@ import type { LayoutServerLoad } from './$types';
 
 export const load: LayoutServerLoad = async ({ locals }) => {
 	if (!locals.user) return { user: null };
-	const { id, name, companyId, rateCentsPerKm, currency, createdAt } = locals.user;
+	const {
+		id,
+		name,
+		companyId,
+		rateCentsPerKm,
+		currency,
+		createdAt,
+		homeAddress,
+		officeAddress,
+		commuteDistanceM
+	} = locals.user;
 
 	let companyName: string | null = null;
 	if (companyId) {
@@ -18,6 +28,17 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 	}
 
 	return {
-		user: { id, name, companyId, companyName, rateCentsPerKm, currency, createdAt }
+		user: {
+			id,
+			name,
+			companyId,
+			companyName,
+			rateCentsPerKm,
+			currency,
+			createdAt,
+			homeAddress,
+			officeAddress,
+			commuteDistanceM
+		}
 	};
 };

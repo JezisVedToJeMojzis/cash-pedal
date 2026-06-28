@@ -46,18 +46,7 @@ export default defineConfig({
 				]
 			},
 			workbox: {
-				globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}'],
-				// Leaflet OSM tiles — cache at runtime so the map works offline-ish.
-				runtimeCaching: [
-					{
-						urlPattern: /^https:\/\/[a-c]\.tile\.openstreetmap\.org\/.*/i,
-						handler: 'CacheFirst',
-						options: {
-							cacheName: 'osm-tiles',
-							expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 30 }
-						}
-					}
-				]
+				globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}']
 			}
 		})
 	]

@@ -10,7 +10,18 @@ declare global {
 		}
 		interface PageData {
 			user?:
-				| (Pick<User, 'id' | 'name' | 'companyId' | 'rateCentsPerKm' | 'currency' | 'createdAt'> & {
+				| (Pick<
+						User,
+						| 'id'
+						| 'name'
+						| 'companyId'
+						| 'rateCentsPerKm'
+						| 'currency'
+						| 'createdAt'
+						| 'homeAddress'
+						| 'officeAddress'
+						| 'commuteDistanceM'
+				  > & {
 						companyName: string | null;
 				  })
 				| null;

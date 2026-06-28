@@ -17,6 +17,8 @@
 	function msg(section: string) {
 		return form?.section === section ? form : null;
 	}
+
+	let commuteLoading = $state(false);
 </script>
 
 <svelte:head><title>Profile · CashPedal</title></svelte:head>
@@ -86,6 +88,66 @@
 				Leave empty to remove. Determines your company leaderboard.
 			</p>
 			<button type="submit">Save company</button>
+		</form>
+	</div>
+
+	<!-- Commute addresses -->
+	<div class="card">
+		<h2>Commute</h2>
+		<p class="muted" style="font-size:.82rem;margin:-.3rem 0 .8rem">
+			Save your home and office so you can log a ride with one tap. We work out the cycling distance
+			between them.
+		</p>
+		{#if msg('commute')?.error}<p class="error">{msg('commute')!.error}</p>{/if}
+		{#if msg('commute')?.saved}
+			{#if msg('commute')!.cleared}
+				<p class="success">✓ Commute cleared</p>
+			{:else}
+				<p class="success">
+					✓ Saved — {formatDistance(msg('commute')!.distanceM ?? 0)} each way{msg('commute')!
+						.approximate
+						? ' (approx.)'
+						: ' by bike'}
+				</p>
+			{/if}
+		{/if}
+		<form
+			method="POST"
+			action="?/commute"
+			use:enhance={() => {
+				commuteLoading = true;
+				return async ({ update }) => {
+					await update();
+					commuteLoading = false;
+				};
+			}}
+		>
+			<label for="homeAddress">Home address</label>
+			<input
+				id="homeAddress"
+				name="homeAddress"
+				value={user.homeAddress ?? ''}
+				placeholder="Street, city, country"
+				autocomplete="off"
+			/>
+			<label for="officeAddress">Office address</label>
+			<input
+				id="officeAddress"
+				name="officeAddress"
+				value={user.officeAddress ?? ''}
+				placeholder="Street, city, country"
+				autocomplete="off"
+			/>
+			{#if user.commuteDistanceM != null}
+				<p class="muted" style="font-size:.82rem;margin:-.3rem 0 .9rem">
+					Current commute: <strong style="color:var(--brand-bright)"
+						>{formatDistance(user.commuteDistanceM)}</strong
+					> each way. Leave both empty to clear.
+				</p>
+			{/if}
+			<button type="submit" disabled={commuteLoading}>
+				{commuteLoading ? 'Finding route…' : 'Save commute'}
+			</button>
 		</form>
 	</div>
 

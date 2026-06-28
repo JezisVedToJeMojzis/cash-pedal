@@ -2,25 +2,12 @@
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
-	import {
-		formatMoney,
-		formatDistance,
-		formatDuration,
-		formatSpeed,
-		monthLabel
-	} from '$lib/format';
-	let { data, form } = $props();
+	import { formatMoney, formatDistance, monthLabel } from '$lib/format';
+	let { data } = $props();
 
 	const justSaved = $derived(page.url.searchParams.get('saved'));
 
 	let view = $state<'month' | 'all'>('month');
-
-	// Manual ride entry (current month only).
-	let showAdd = $state(false);
-	const ymd = (d: Date) =>
-		`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-	const todayStr = ymd(new Date());
-	const monthStartStr = $derived(`${data.currentKey}-01`);
 
 	const currentTotal = $derived(
 		data.currentRides.reduce(
@@ -41,13 +28,11 @@
 		showDelete = true;
 	}
 
-	function rideTime(d: string | Date) {
+	function rideDate(d: string | Date) {
 		return new Date(d).toLocaleDateString(undefined, {
 			weekday: 'short',
 			day: 'numeric',
-			month: 'short',
-			hour: '2-digit',
-			minute: '2-digit'
+			month: 'short'
 		});
 	}
 </script>
@@ -58,13 +43,13 @@
 	<h1>History</h1>
 
 	{#if justSaved}
-		<p class="success">✓ Ride saved! Nice work.</p>
+		<p class="success">✓ Ride logged! Nice work.</p>
 	{/if}
 
 	{#if data.monthly.length === 0}
 		<div class="card" style="text-align:center">
 			<p class="muted">No rides yet.</p>
-			<a class="btn" href="/track" style="margin-top:.5rem">Start your first ride</a>
+			<a class="btn" href="/track" style="margin-top:.5rem">Log your first ride</a>
 		</div>
 	{:else}
 		<div class="btn-row" style="margin:.5rem 0 1rem">
@@ -78,43 +63,11 @@
 				<strong style="color:var(--brand-bright)">{formatMoney(currentTotal.earningsCents, data.currency)}</strong>
 			</div>
 
-			<!-- Add a forgotten ride by hand -->
-			{#if showAdd}
-				<div class="card" style="margin-bottom:.75rem">
-					<h3 style="margin:0 0 .6rem">Add a ride manually</h3>
-					{#if form?.manualError}<p class="error">{form.manualError}</p>{/if}
-					<form
-						method="POST"
-						action="?/manual"
-						use:enhance={() => async ({ result, update }) => {
-							await update();
-							if (result.type === 'success') showAdd = false;
-						}}
-					>
-						<div class="field-inline" style="align-items:flex-start">
-							<div style="flex:1">
-								<label for="date">Date</label>
-								<input id="date" name="date" type="date" value={todayStr} min={monthStartStr} max={todayStr} />
-							</div>
-							<div style="flex:1">
-								<label for="distance">Distance (km)</label>
-								<input id="distance" name="distance" type="number" step="0.01" min="0" inputmode="decimal" placeholder="e.g. 8.5" />
-							</div>
-						</div>
-						<div class="btn-row">
-							<button type="button" class="btn-ghost" onclick={() => (showAdd = false)}>Cancel</button>
-							<button type="submit">Add ride</button>
-						</div>
-					</form>
-				</div>
-			{:else}
-				<button class="btn-ghost" style="margin-bottom:.75rem" onclick={() => (showAdd = true)}>
-					+ Add a ride manually
-				</button>
-			{/if}
-
 			{#if data.currentRides.length === 0}
-				<div class="card"><p class="muted" style="margin:0">No rides this month yet.</p></div>
+				<div class="card" style="text-align:center">
+					<p class="muted" style="margin:0 0 .5rem">No rides this month yet.</p>
+					<a class="btn" href="/track">Log a ride</a>
+				</div>
 			{:else}
 				<p class="muted" style="margin:0 0 .6rem;font-size:.85rem">
 					{formatDistance(currentTotal.distanceM)} · {data.currentRides.length} ride{data.currentRides
@@ -126,20 +79,12 @@
 					{#each data.currentRides as ride}
 						<div class="list-row">
 							<div style="flex:1;min-width:0">
-								<div>
-									{rideTime(ride.startedAt)}
-									{#if ride.manual}<span class="badge">manual</span>{/if}
-								</div>
-								<div class="muted" style="font-size:.8rem">
-									{#if ride.manual}
-										{formatDistance(ride.distanceM)} · entered by hand
-									{:else}
-										{formatDistance(ride.distanceM)} · {formatDuration(ride.durationS)} · {formatSpeed(
-											ride.distanceM,
-											ride.durationS
-										)}
-									{/if}
-								</div>
+								<div>{rideDate(ride.startedAt)} · <strong>{formatDistance(ride.distanceM)}</strong></div>
+								{#if ride.startPoint && ride.endPoint}
+									<div class="route muted" title="{ride.startPoint} → {ride.endPoint}">
+										{ride.startPoint} → {ride.endPoint}
+									</div>
+								{/if}
 							</div>
 							<strong>{formatMoney(ride.earningsCents, data.currency)}</strong>
 							<button
@@ -203,6 +148,13 @@
 />
 
 <style>
+	.route {
+		font-size: 0.78rem;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		margin-top: 0.1rem;
+	}
 	.del-btn {
 		width: 34px;
 		height: 34px;

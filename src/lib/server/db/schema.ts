@@ -34,6 +34,10 @@ export const users = pgTable('users', {
 	/** Compensation rate in cents per kilometre (integer to avoid float drift). */
 	rateCentsPerKm: integer('rate_cents_per_km').notNull().default(0),
 	currency: text('currency').notNull().default('EUR'),
+	/** Saved commute endpoints + the cycling distance between them (metres). */
+	homeAddress: text('home_address'),
+	officeAddress: text('office_address'),
+	commuteDistanceM: doublePrecision('commute_distance_m'),
 	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 }, (t) => [
 	// Case-insensitive unique usernames.
@@ -67,6 +71,9 @@ export const rides = pgTable('rides', {
 	track: jsonb('track').$type<TrackPoint[]>().notNull().default([]),
 	/** True if the user entered this ride by hand (no GPS recording). */
 	manual: boolean('manual').notNull().default(false),
+	/** Start and end addresses of the commute. */
+	startPoint: text('start_point'),
+	endPoint: text('end_point'),
 	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 }, (t) => [
 	index('rides_user_started_idx').on(t.userId, t.startedAt)

@@ -10,6 +10,7 @@ import {
 	verifyPassword
 } from '$lib/server/auth';
 import { resolveCompanyByName } from '$lib/server/companies';
+import { resolveCommute } from '$lib/server/geocode';
 import type { Actions, PageServerLoad } from './$types';
 
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'CZK', 'PLN', 'CHF', 'SEK', 'NOK', 'DKK'];
@@ -60,6 +61,46 @@ export const actions: Actions = {
 		const companyId = await resolveCompanyByName(company);
 		await db.update(users).set({ companyId }).where(eq(users.id, user.id));
 		return { section: 'company', saved: true };
+	},
+
+	commute: async ({ request, locals }) => {
+		const user = locals.user!;
+		const form = await request.formData();
+		const home = String(form.get('homeAddress') ?? '').trim();
+		const office = String(form.get('officeAddress') ?? '').trim();
+
+		// Both empty clears the saved commute.
+		if (!home && !office) {
+			await db
+				.update(users)
+				.set({ homeAddress: null, officeAddress: null, commuteDistanceM: null })
+				.where(eq(users.id, user.id));
+			return { section: 'commute', saved: true, cleared: true };
+		}
+		if (!home || !office) {
+			return fail(400, { section: 'commute', error: 'Enter both your home and office address.' });
+		}
+
+		const result = await resolveCommute(home, office);
+		if ('error' in result) {
+			const which = result.error === 'home' ? 'home' : 'office';
+			return fail(400, {
+				section: 'commute',
+				error: `Couldn't find the ${which} address. Try adding the city and country.`
+			});
+		}
+
+		await db
+			.update(users)
+			.set({ homeAddress: home, officeAddress: office, commuteDistanceM: result.distanceM })
+			.where(eq(users.id, user.id));
+
+		return {
+			section: 'commute',
+			saved: true,
+			distanceM: result.distanceM,
+			approximate: result.approximate
+		};
 	},
 
 	account: async ({ request, locals }) => {
