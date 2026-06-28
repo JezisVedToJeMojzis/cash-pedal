@@ -56,7 +56,7 @@
 				};
 			}}
 		>
-			<label for="date">Date</label>
+			<label for="date" style="margin-top:1.25rem">Date</label>
 			<input id="date" name="date" type="date" value={todayStr} max={todayStr} />
 
 			<div class="ride-buttons">

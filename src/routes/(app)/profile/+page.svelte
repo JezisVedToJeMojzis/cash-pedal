@@ -19,6 +19,14 @@
 	}
 
 	let commuteLoading = $state(false);
+
+	let tab = $state<'ride' | 'account'>('ride');
+	// Keep the right tab open when an action returns a message.
+	$effect(() => {
+		const s = form?.section;
+		if (s === 'settings' || s === 'commute') tab = 'ride';
+		else if (s === 'company' || s === 'account' || s === 'password') tab = 'account';
+	});
 </script>
 
 <svelte:head><title>Profile · CashPedal</title></svelte:head>
@@ -56,8 +64,15 @@
 		</div>
 	</div>
 
+	<!-- Tabs: Ride vs Account settings -->
+	<div class="btn-row" style="margin:1rem 0">
+		<button class:btn-ghost={tab !== 'ride'} onclick={() => (tab = 'ride')}>Ride settings</button>
+		<button class:btn-ghost={tab !== 'account'} onclick={() => (tab = 'account')}>Account</button>
+	</div>
+
+	{#if tab === 'ride'}
 	<!-- Compensation settings -->
-	<div class="card" style="margin-top:.75rem">
+	<div class="card">
 		<h2>Compensation</h2>
 		{#if msg('settings')?.error}<p class="error">{msg('settings')!.error}</p>{/if}
 		{#if msg('settings')?.saved}<p class="success">✓ Saved</p>{/if}
@@ -76,21 +91,6 @@
 		</form>
 	</div>
 
-	<!-- Company -->
-	<div class="card">
-		<h2>Company</h2>
-		{#if msg('company')?.error}<p class="error">{msg('company')!.error}</p>{/if}
-		{#if msg('company')?.saved}<p class="success">✓ Company updated</p>{/if}
-		<form method="POST" action="?/company" use:enhance>
-			<label for="company">Your company</label>
-			<CompanyInput value={user.companyName ?? ''} placeholder="Start typing — pick if it exists" />
-			<p class="muted" style="font-size:.8rem;margin:-.4rem 0 .9rem">
-				Leave empty to remove. Determines your company leaderboard.
-			</p>
-			<button type="submit">Save company</button>
-		</form>
-	</div>
-
 	<!-- Commute addresses -->
 	<div class="card">
 		<h2>Commute</h2>
@@ -104,10 +104,11 @@
 				<p class="success">✓ Commute cleared</p>
 			{:else}
 				<p class="success">
-					✓ Saved — {formatDistance(msg('commute')!.distanceM ?? 0)} each way{msg('commute')!
-						.approximate
-						? ' (approx.)'
-						: ' by bike'}
+					✓ Saved — {formatDistance(msg('commute')!.distanceM ?? 0)} each way{msg('commute')!.manual
+						? ' (your distance)'
+						: msg('commute')!.approximate
+							? ' (approx.)'
+							: ' by bike'}
 				</p>
 			{/if}
 		{/if}
@@ -138,16 +139,47 @@
 				placeholder="Street, city, country"
 				autocomplete="off"
 			/>
+
+			<label for="distanceKm">Distance override (km) — optional</label>
+			<input
+				id="distanceKm"
+				name="distanceKm"
+				type="number"
+				step="0.01"
+				min="0"
+				inputmode="decimal"
+				placeholder="Leave blank to auto-calc the bike route"
+			/>
+			<p class="muted" style="font-size:.8rem;margin:-.4rem 0 .9rem">
+				Set this to use your own figure (e.g. from Google Maps) instead of the calculated cycling
+				route.
+			</p>
+
 			{#if user.commuteDistanceM != null}
-				<p class="muted" style="font-size:.82rem;margin:-.3rem 0 .9rem">
+				<p class="muted" style="font-size:.82rem;margin:0 0 .9rem">
 					Current commute: <strong style="color:var(--brand-bright)"
 						>{formatDistance(user.commuteDistanceM)}</strong
-					> each way. Leave both empty to clear.
+					> each way. Leave all fields empty to clear.
 				</p>
 			{/if}
 			<button type="submit" disabled={commuteLoading}>
 				{commuteLoading ? 'Finding route…' : 'Save commute'}
 			</button>
+		</form>
+	</div>
+	{:else}
+	<!-- Company -->
+	<div class="card">
+		<h2>Company</h2>
+		{#if msg('company')?.error}<p class="error">{msg('company')!.error}</p>{/if}
+		{#if msg('company')?.saved}<p class="success">✓ Company updated</p>{/if}
+		<form method="POST" action="?/company" use:enhance>
+			<label for="company">Your company</label>
+			<CompanyInput value={user.companyName ?? ''} placeholder="Start typing — pick if it exists" />
+			<p class="muted" style="font-size:.8rem;margin:-.4rem 0 .9rem">
+				Leave empty to remove. Determines your company leaderboard.
+			</p>
+			<button type="submit">Save company</button>
 		</form>
 	</div>
 
@@ -177,9 +209,10 @@
 		</form>
 	</div>
 
-	<form method="POST" action="?/logout" use:enhance style="margin-top:.75rem">
-		<button class="btn-ghost" type="submit">Log out</button>
-	</form>
+		<form method="POST" action="?/logout" use:enhance style="margin-top:.75rem">
+			<button class="btn-ghost" type="submit">Log out</button>
+		</form>
+	{/if}
 </div>
 
 <style>

@@ -68,6 +68,7 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const home = String(form.get('homeAddress') ?? '').trim();
 		const office = String(form.get('officeAddress') ?? '').trim();
+		const overrideRaw = String(form.get('distanceKm') ?? '').trim();
 
 		// Both empty clears the saved commute.
 		if (!home && !office) {
@@ -81,6 +82,21 @@ export const actions: Actions = {
 			return fail(400, { section: 'commute', error: 'Enter both your home and office address.' });
 		}
 
+		// Manual distance override (e.g. taken from Google Maps): use it as-is,
+		// no geocoding/routing needed.
+		if (overrideRaw) {
+			const km = parseFloat(overrideRaw.replace(',', '.'));
+			if (!Number.isFinite(km) || km <= 0) {
+				return fail(400, { section: 'commute', error: 'Enter a valid distance in km (e.g. 10.5).' });
+			}
+			await db
+				.update(users)
+				.set({ homeAddress: home, officeAddress: office, commuteDistanceM: km * 1000 })
+				.where(eq(users.id, user.id));
+			return { section: 'commute', saved: true, distanceM: km * 1000, manual: true };
+		}
+
+		// Otherwise auto-calculate the cycling route distance.
 		const result = await resolveCommute(home, office);
 		if ('error' in result) {
 			const which = result.error === 'home' ? 'home' : 'office';
