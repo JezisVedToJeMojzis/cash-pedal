@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
+	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import {
 		formatMoney,
 		formatDistance,
@@ -12,8 +13,12 @@
 
 	const justSaved = $derived(page.url.searchParams.get('saved'));
 
-	function confirmDelete(e: SubmitEvent) {
-		if (!confirm('Delete this ride? This cannot be undone.')) e.preventDefault();
+	let showDelete = $state(false);
+	let pendingDeleteId = $state<number | null>(null);
+	let deleteForm: HTMLFormElement;
+	function openDelete(id: number) {
+		pendingDeleteId = id;
+		showDelete = true;
 	}
 
 	function rideTime(d: string | Date) {
@@ -64,10 +69,18 @@
 								</div>
 							</div>
 							<strong>{formatMoney(ride.earningsCents, data.currency)}</strong>
-							<form method="POST" action="?/delete" use:enhance onsubmit={confirmDelete}>
-								<input type="hidden" name="id" value={ride.id} />
-								<button type="submit" class="del-btn" aria-label="Delete ride" title="Delete ride">✕</button>
-							</form>
+							<button
+								type="button"
+								class="del-btn"
+								aria-label="Delete ride"
+								title="Delete ride"
+								onclick={() => openDelete(ride.id)}
+							>
+								<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+									stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+									<path d="M4 7h16M10 11v6M14 11v6M5 7l1 13a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1l1-13M9 7V4h6v3" />
+								</svg>
+							</button>
 						</div>
 					{/each}
 				</div>
@@ -75,6 +88,28 @@
 		{/each}
 	{/if}
 </div>
+
+<form
+	bind:this={deleteForm}
+	method="POST"
+	action="?/delete"
+	use:enhance={() => async ({ update }) => {
+		await update();
+		pendingDeleteId = null;
+	}}
+	style="display:none"
+>
+	<input type="hidden" name="id" value={pendingDeleteId} />
+</form>
+
+<ConfirmDialog
+	bind:open={showDelete}
+	title="Delete ride?"
+	message="This permanently removes the ride from your history."
+	confirmLabel="Delete"
+	danger
+	onconfirm={() => deleteForm.requestSubmit()}
+/>
 
 <style>
 	.del-btn {

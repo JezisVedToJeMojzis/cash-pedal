@@ -11,6 +11,7 @@
 		formatSpeed,
 		formatRate
 	} from '$lib/format';
+	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import type { TrackPoint } from '$lib/server/db/schema';
 
 	const user = $derived(page.data.user!);
@@ -22,6 +23,8 @@
 	let error = $state('');
 	let gpsReady = $state(false);
 	let collapsed = $state(false); // minimise the stats panel to see more of the map
+	let showFinishConfirm = $state(false);
+	let showDiscardConfirm = $state(false);
 	const activeRide = $derived(status === 'tracking' || status === 'paused');
 
 	let track: TrackPoint[] = [];
@@ -172,8 +175,6 @@
 	}
 
 	async function stop() {
-		// Guard against an accidental tap ending the ride.
-		if (!confirm('Finish and save this ride?')) return;
 		// Finalize active time if we're stopping mid-segment (not from a pause).
 		if (status === 'tracking') activeMs += Date.now() - segmentStart;
 		stopWatching();
@@ -283,7 +284,7 @@
 								{@render playIcon()}
 							</button>
 						{/if}
-						<button class="btn-danger icon-btn" onclick={stop} aria-label="Finish">
+						<button class="btn-danger icon-btn" onclick={() => (showFinishConfirm = true)} aria-label="Finish">
 							{@render stopIcon()}
 						</button>
 					</div>
@@ -337,15 +338,15 @@
 				{:else if status === 'tracking'}
 					<div class="btn-row" style="margin-top:.9rem">
 						<button class="btn-ghost" onclick={pause}>{@render pauseIcon()} Pause</button>
-						<button class="btn-danger" onclick={stop}>{@render stopIcon()} Finish</button>
+						<button class="btn-danger" onclick={() => (showFinishConfirm = true)}>{@render stopIcon()} Finish</button>
 					</div>
-					<button class="btn-text" onclick={cancel}>Discard ride</button>
+					<button class="btn-text" onclick={() => (showDiscardConfirm = true)}>Discard ride</button>
 				{:else if status === 'paused'}
 					<div class="btn-row" style="margin-top:.9rem">
 						<button onclick={resume}>{@render playIcon()} Resume</button>
-						<button class="btn-danger" onclick={stop}>{@render stopIcon()} Finish</button>
+						<button class="btn-danger" onclick={() => (showFinishConfirm = true)}>{@render stopIcon()} Finish</button>
 					</div>
-					<button class="btn-text" onclick={cancel}>Discard ride</button>
+					<button class="btn-text" onclick={() => (showDiscardConfirm = true)}>Discard ride</button>
 				{:else}
 					<button disabled style="margin-top:.9rem">Saving…</button>
 				{/if}
@@ -353,6 +354,23 @@
 		</div>
 	</div>
 </div>
+
+<ConfirmDialog
+	bind:open={showFinishConfirm}
+	title="Finish ride?"
+	message="This ends and saves your ride."
+	confirmLabel="Finish"
+	danger
+	onconfirm={stop}
+/>
+<ConfirmDialog
+	bind:open={showDiscardConfirm}
+	title="Discard ride?"
+	message="This deletes the current ride without saving. This can't be undone."
+	confirmLabel="Discard"
+	danger
+	onconfirm={cancel}
+/>
 
 <style>
 	.track-wrap {
