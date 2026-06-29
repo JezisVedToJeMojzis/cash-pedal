@@ -22,7 +22,7 @@
 	{@html webManifestLink}
 	<link rel="icon" href={favicon} />
 	<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-	<meta name="theme-color" content="#16a34a" />
+	<meta name="theme-color" content="#7c3aed" />
 	<meta
 		name="viewport"
 		content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1"

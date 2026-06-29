@@ -1,7 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
-import { eq, sql } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
-import { users, rides } from '$lib/server/db/schema';
+import { users, rides, routes } from '$lib/server/db/schema';
 import {
 	clearSessionCookie,
 	deleteSession,
@@ -26,9 +26,16 @@ export const load: PageServerLoad = async ({ locals }) => {
 		.from(rides)
 		.where(eq(rides.userId, user.id));
 
+	const myRoutes = await db
+		.select()
+		.from(routes)
+		.where(eq(routes.userId, user.id))
+		.orderBy(asc(routes.createdAt));
+
 	return {
 		currencies: CURRENCIES,
-		totals: agg
+		totals: agg,
+		routes: myRoutes
 	};
 };
 
@@ -63,60 +70,69 @@ export const actions: Actions = {
 		return { section: 'company', saved: true };
 	},
 
-	commute: async ({ request, locals }) => {
+	// Add a new route or edit an existing one (when routeId is present).
+	route: async ({ request, locals }) => {
 		const user = locals.user!;
 		const form = await request.formData();
-		const home = String(form.get('homeAddress') ?? '').trim();
-		const office = String(form.get('officeAddress') ?? '').trim();
+		const routeId = Number(form.get('routeId')) || 0;
+		const startLabel = String(form.get('startLabel') ?? '').trim() || 'Home';
+		const endLabel = String(form.get('endLabel') ?? '').trim() || 'Office';
+		const start = String(form.get('startAddress') ?? '').trim();
+		const end = String(form.get('endAddress') ?? '').trim();
 		const overrideRaw = String(form.get('distanceKm') ?? '').trim();
 
-		// Both empty clears the saved commute.
-		if (!home && !office) {
-			await db
-				.update(users)
-				.set({ homeAddress: null, officeAddress: null, commuteDistanceM: null })
-				.where(eq(users.id, user.id));
-			return { section: 'commute', saved: true, cleared: true };
-		}
-		if (!home || !office) {
-			return fail(400, { section: 'commute', error: 'Enter both your home and office address.' });
+		if (!start || !end) {
+			return fail(400, { section: 'route', error: 'Enter both a start and an office address.' });
 		}
 
-		// Manual distance override (e.g. taken from Google Maps): use it as-is,
-		// no geocoding/routing needed.
+		let distanceM: number;
+		let approximate = false;
 		if (overrideRaw) {
 			const km = parseFloat(overrideRaw.replace(',', '.'));
 			if (!Number.isFinite(km) || km <= 0) {
-				return fail(400, { section: 'commute', error: 'Enter a valid distance in km (e.g. 10.5).' });
+				return fail(400, { section: 'route', error: 'Enter a valid distance in km (e.g. 10.5).' });
 			}
-			await db
-				.update(users)
-				.set({ homeAddress: home, officeAddress: office, commuteDistanceM: km * 1000 })
-				.where(eq(users.id, user.id));
-			return { section: 'commute', saved: true, distanceM: km * 1000, manual: true };
+			distanceM = km * 1000;
+		} else {
+			const result = await resolveCommute(start, end);
+			if ('error' in result) {
+				const which = result.error === 'home' ? 'start' : 'end';
+				return fail(400, {
+					section: 'route',
+					error: `Couldn't find the ${which} address. Try adding the city and country.`
+				});
+			}
+			distanceM = result.distanceM;
+			approximate = result.approximate;
 		}
 
-		// Otherwise auto-calculate the cycling route distance.
-		const result = await resolveCommute(home, office);
-		if ('error' in result) {
-			const which = result.error === 'home' ? 'home' : 'office';
-			return fail(400, {
-				section: 'commute',
-				error: `Couldn't find the ${which} address. Try adding the city and country.`
+		if (routeId) {
+			// Edit — only the user's own route.
+			await db
+				.update(routes)
+				.set({ startLabel, endLabel, startAddress: start, endAddress: end, distanceM })
+				.where(and(eq(routes.id, routeId), eq(routes.userId, user.id)));
+		} else {
+			await db.insert(routes).values({
+				userId: user.id,
+				startLabel,
+				endLabel,
+				startAddress: start,
+				endAddress: end,
+				distanceM
 			});
 		}
 
-		await db
-			.update(users)
-			.set({ homeAddress: home, officeAddress: office, commuteDistanceM: result.distanceM })
-			.where(eq(users.id, user.id));
+		return { section: 'route', saved: true, distanceM, approximate };
+	},
 
-		return {
-			section: 'commute',
-			saved: true,
-			distanceM: result.distanceM,
-			approximate: result.approximate
-		};
+	deleteRoute: async ({ request, locals }) => {
+		const user = locals.user!;
+		const routeId = Number((await request.formData()).get('routeId')) || 0;
+		if (routeId) {
+			await db.delete(routes).where(and(eq(routes.id, routeId), eq(routes.userId, user.id)));
+		}
+		return { section: 'route', deleted: true };
 	},
 
 	account: async ({ request, locals }) => {

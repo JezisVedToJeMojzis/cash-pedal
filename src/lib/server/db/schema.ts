@@ -94,7 +94,26 @@ export const friendships = pgTable('friendships', {
 	uniqueIndex('friendships_pair_idx').on(t.requesterId, t.addresseeId)
 ]);
 
+export const routes = pgTable('routes', {
+	id: serial('id').primaryKey(),
+	userId: integer('user_id')
+		.notNull()
+		.references(() => users.id, { onDelete: 'cascade' }),
+	/** Optional friendly name, e.g. "Girlfriend's place". */
+	name: text('name'),
+	/** Friendly labels for each endpoint, e.g. "Home" and "Office". */
+	startLabel: text('start_label').notNull().default('Home'),
+	endLabel: text('end_label').notNull().default('Office'),
+	startAddress: text('start_address').notNull(),
+	endAddress: text('end_address').notNull(),
+	distanceM: doublePrecision('distance_m').notNull(),
+	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+}, (t) => [
+	index('routes_user_idx').on(t.userId)
+]);
+
 export type Company = typeof companies.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type Ride = typeof rides.$inferSelect;
 export type Friendship = typeof friendships.$inferSelect;
+export type Route = typeof routes.$inferSelect;

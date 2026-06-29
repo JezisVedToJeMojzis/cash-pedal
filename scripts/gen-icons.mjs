@@ -8,7 +8,7 @@ import { dirname, join } from 'node:path';
 const outDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'static', 'icons');
 await mkdir(outDir, { recursive: true });
 
-const BG = '#16a34a';
+const BG = '#7c3aed';
 const BG_DARK = '#0f172a';
 
 // Bicycle glyph drawn on a 24x24 grid, scaled into the icon.

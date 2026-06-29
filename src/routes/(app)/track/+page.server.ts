@@ -1,37 +1,51 @@
 import { fail, redirect } from '@sveltejs/kit';
+import { and, asc, eq } from 'drizzle-orm';
 import { db } from '$lib/server/db';
-import { rides } from '$lib/server/db/schema';
+import { rides, routes } from '$lib/server/db/schema';
 import { computeEarningsCents } from '$lib/format';
-import type { Actions } from './$types';
+import type { Actions, PageServerLoad } from './$types';
+
+export const load: PageServerLoad = async ({ locals }) => {
+	const user = locals.user!;
+	const myRoutes = await db
+		.select()
+		.from(routes)
+		.where(eq(routes.userId, user.id))
+		.orderBy(asc(routes.createdAt));
+	return { routes: myRoutes };
+};
 
 export const actions: Actions = {
-	commute: async ({ request, locals }) => {
+	log: async ({ request, locals }) => {
 		const user = locals.user!;
-		if (!user.homeAddress || !user.officeAddress || user.commuteDistanceM == null) {
-			return fail(400, { error: 'Set your home and office addresses in Profile first.' });
-		}
-
 		const form = await request.formData();
+		const routeId = Number(form.get('routeId')) || 0;
 		const direction = String(form.get('direction'));
-		if (direction !== 'to_office' && direction !== 'to_home') {
+		const dateStr = String(form.get('date') ?? '');
+
+		const [route] = await db
+			.select()
+			.from(routes)
+			.where(and(eq(routes.id, routeId), eq(routes.userId, user.id)))
+			.limit(1);
+		if (!route) return fail(400, { error: 'Pick a route.' });
+		if (direction !== 'forward' && direction !== 'reverse') {
 			return fail(400, { error: 'Pick a direction.' });
 		}
 
-		// Date (defaults to today); never in the future.
-		const dateStr = String(form.get('date') ?? '');
-		let date = new Date();
-		if (dateStr) {
-			const [y, m, d] = dateStr.split('-').map(Number);
-			if (y && m && d) date = new Date(y, m - 1, d, 12, 0, 0);
-		}
-		if (date.getTime() > Date.now()) {
-			return fail(400, { error: "The date can't be in the future." });
-		}
+		// Compare by calendar day (not timestamp) so logging *today* always works.
+		const now = new Date();
+		const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+		const useDateStr = dateStr || todayStr;
+		if (useDateStr > todayStr) return fail(400, { error: "The date can't be in the future." });
+		const [y, m, d] = useDateStr.split('-').map(Number);
+		if (!y || !m || !d) return fail(400, { error: 'Pick a valid date.' });
+		const date = new Date(y, m - 1, d, 12, 0, 0);
 
-		const toOffice = direction === 'to_office';
-		const startPoint = toOffice ? user.homeAddress : user.officeAddress;
-		const endPoint = toOffice ? user.officeAddress : user.homeAddress;
-		const distanceM = user.commuteDistanceM;
+		const forward = direction === 'forward';
+		const startPoint = forward ? route.startLabel : route.endLabel;
+		const endPoint = forward ? route.endLabel : route.startLabel;
+		const distanceM = route.distanceM;
 
 		await db.insert(rides).values({
 			userId: user.id,

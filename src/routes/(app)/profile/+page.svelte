@@ -18,15 +18,48 @@
 		return form?.section === section ? form : null;
 	}
 
-	let commuteLoading = $state(false);
-
 	let tab = $state<'ride' | 'account'>('ride');
 	// Keep the right tab open when an action returns a message.
 	$effect(() => {
 		const s = form?.section;
-		if (s === 'settings' || s === 'commute') tab = 'ride';
+		if (s === 'settings' || s === 'route') tab = 'ride';
 		else if (s === 'company' || s === 'account' || s === 'password') tab = 'account';
 	});
+
+	// Route add/edit form state.
+	const shortAddr = (a: string) => a.split(',')[0].trim();
+	const routeLabel = (r: { startLabel: string; endLabel: string }) =>
+		`${r.startLabel} ↔ ${r.endLabel}`;
+
+	let routeLoading = $state(false);
+	let routeFormOpen = $state(false);
+	let fId = $state(0);
+	let fStartLabel = $state('Home');
+	let fEndLabel = $state('Office');
+	let fStart = $state('');
+	let fEnd = $state('');
+	function openAddRoute() {
+		fId = 0;
+		fStartLabel = 'Home';
+		fEndLabel = 'Office';
+		fStart = '';
+		fEnd = '';
+		routeFormOpen = true;
+	}
+	function openEditRoute(r: {
+		id: number;
+		startLabel: string;
+		endLabel: string;
+		startAddress: string;
+		endAddress: string;
+	}) {
+		fId = r.id;
+		fStartLabel = r.startLabel;
+		fEndLabel = r.endLabel;
+		fStart = r.startAddress;
+		fEnd = r.endAddress;
+		routeFormOpen = true;
+	}
 </script>
 
 <svelte:head><title>Profile · CashPedal</title></svelte:head>
@@ -91,81 +124,73 @@
 		</form>
 	</div>
 
-	<!-- Commute addresses -->
+	<!-- Routes -->
 	<div class="card">
-		<h2>Commute</h2>
+		<h2>Routes</h2>
 		<p class="muted" style="font-size:.82rem;margin:-.3rem 0 .8rem">
-			Save your home and office so you can log a ride with one tap. We work out the cycling distance
-			between them.
+			Add the trips you cycle (home↔office, partner's place, …) so you can log them with one tap. We
+			work out the cycling distance, or set your own.
 		</p>
-		{#if msg('commute')?.error}<p class="error">{msg('commute')!.error}</p>{/if}
-		{#if msg('commute')?.saved}
-			{#if msg('commute')!.cleared}
-				<p class="success">✓ Commute cleared</p>
-			{:else}
-				<p class="success">
-					✓ Saved — {formatDistance(msg('commute')!.distanceM ?? 0)} each way{msg('commute')!.manual
-						? ' (your distance)'
-						: msg('commute')!.approximate
-							? ' (approx.)'
-							: ' by bike'}
-				</p>
-			{/if}
+
+		{#if msg('route')?.error}<p class="error">{msg('route')!.error}</p>{/if}
+		{#if msg('route')?.saved}<p class="success">✓ Route saved — {formatDistance(msg('route')!.distanceM ?? 0)}{msg('route')!.approximate ? ' (approx.)' : ''}</p>{/if}
+
+		{#if data.routes.length === 0}
+			<p class="muted">No routes yet.</p>
+		{:else}
+			{#each data.routes as r}
+				<div class="route-row">
+					<div style="flex:1;min-width:0">
+						<div style="font-weight:600">🏠 {r.startLabel} → 🏢 {r.endLabel}</div>
+						<div class="muted" style="font-size:.78rem">
+							{shortAddr(r.startAddress)} → {shortAddr(r.endAddress)} · {formatDistance(r.distanceM)}
+						</div>
+					</div>
+					<button type="button" class="mini-btn btn-ghost" onclick={() => openEditRoute(r)}>Edit</button>
+					<form method="POST" action="?/deleteRoute" use:enhance>
+						<input type="hidden" name="routeId" value={r.id} />
+						<button type="submit" class="mini-btn btn-ghost">Delete</button>
+					</form>
+				</div>
+			{/each}
 		{/if}
-		<form
-			method="POST"
-			action="?/commute"
-			use:enhance={() => {
-				commuteLoading = true;
-				return async ({ update }) => {
-					await update();
-					commuteLoading = false;
-				};
-			}}
-		>
-			<label for="homeAddress">Home address</label>
-			<input
-				id="homeAddress"
-				name="homeAddress"
-				value={user.homeAddress ?? ''}
-				placeholder="Street, city, country"
-				autocomplete="off"
-			/>
-			<label for="officeAddress">Office address</label>
-			<input
-				id="officeAddress"
-				name="officeAddress"
-				value={user.officeAddress ?? ''}
-				placeholder="Street, city, country"
-				autocomplete="off"
-			/>
 
-			<label for="distanceKm">Distance override (km) — optional</label>
-			<input
-				id="distanceKm"
-				name="distanceKm"
-				type="number"
-				step="0.01"
-				min="0"
-				inputmode="decimal"
-				placeholder="Leave blank to auto-calc the bike route"
-			/>
-			<p class="muted" style="font-size:.8rem;margin:-.4rem 0 .9rem">
-				Set this to use your own figure (e.g. from Google Maps) instead of the calculated cycling
-				route.
-			</p>
-
-			{#if user.commuteDistanceM != null}
-				<p class="muted" style="font-size:.82rem;margin:0 0 .9rem">
-					Current commute: <strong style="color:var(--brand-bright)"
-						>{formatDistance(user.commuteDistanceM)}</strong
-					> each way. Leave all fields empty to clear.
+		{#if routeFormOpen}
+			<form
+				method="POST"
+				action="?/route"
+				style="margin-top:1rem;border-top:1px solid var(--border);padding-top:1rem"
+				use:enhance={() => {
+					routeLoading = true;
+					return async ({ result, update }) => {
+						await update();
+						routeLoading = false;
+						if (result.type === 'success') routeFormOpen = false;
+					};
+				}}
+			>
+				<input type="hidden" name="routeId" value={fId} />
+				<label for="rslabel">🏠 Start name</label>
+				<input id="rslabel" name="startLabel" value={fStartLabel} placeholder="Home" autocomplete="off" />
+				<label for="rstart">Start address</label>
+				<input id="rstart" name="startAddress" value={fStart} placeholder="Street, city, country" autocomplete="off" />
+				<label for="relabel">🏢 Office name</label>
+				<input id="relabel" name="endLabel" value={fEndLabel} placeholder="Office" autocomplete="off" />
+				<label for="rend">Office address</label>
+				<input id="rend" name="endAddress" value={fEnd} placeholder="Street, city, country" autocomplete="off" />
+				<label for="rdist">Distance override (km) — optional</label>
+				<input id="rdist" name="distanceKm" type="number" step="0.01" min="0" inputmode="decimal" placeholder="Leave blank to auto-calc the bike route" />
+				<p class="muted" style="font-size:.8rem;margin:-.4rem 0 .9rem">
+					Set this to use your own figure (e.g. from Google Maps).
 				</p>
-			{/if}
-			<button type="submit" disabled={commuteLoading}>
-				{commuteLoading ? 'Finding route…' : 'Save commute'}
-			</button>
-		</form>
+				<div class="btn-row">
+					<button type="button" class="btn-ghost" onclick={() => (routeFormOpen = false)}>Cancel</button>
+					<button type="submit" disabled={routeLoading}>{routeLoading ? 'Finding route…' : 'Save route'}</button>
+				</div>
+			</form>
+		{:else}
+			<button class="btn-ghost" style="margin-top:.75rem" onclick={openAddRoute}>+ Add a route</button>
+		{/if}
 	</div>
 	{:else}
 	<!-- Company -->
@@ -227,6 +252,22 @@
 		justify-content: center;
 		font-size: 1.5rem;
 		font-weight: 800;
+		flex-shrink: 0;
+	}
+	.route-row {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.6rem 0;
+		border-bottom: 1px solid var(--border);
+	}
+	.route-row:last-of-type {
+		border-bottom: none;
+	}
+	.mini-btn {
+		width: auto;
+		padding: 0.4rem 0.7rem;
+		font-size: 0.8rem;
 		flex-shrink: 0;
 	}
 </style>

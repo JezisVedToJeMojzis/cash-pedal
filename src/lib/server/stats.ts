@@ -1,11 +1,12 @@
 import { and, desc, eq, gte, inArray, lt, sql } from 'drizzle-orm';
 import { db } from './db';
-import { rides, users } from './db/schema';
+import { companies, rides, users } from './db/schema';
 import { monthKey } from '$lib/format';
 
 export interface LeaderEntry {
 	userId: number;
 	name: string;
+	companyName: string | null;
 	currency: string;
 	distanceM: number;
 	earningsCents: number;
@@ -36,6 +37,7 @@ export async function getLeaderboard(
 		.select({
 			userId: rides.userId,
 			name: users.name,
+			companyName: companies.name,
 			currency: users.currency,
 			distanceM: sql<number>`coalesce(sum(${rides.distanceM}), 0)`,
 			earningsCents: sql<number>`coalesce(sum(${rides.earningsCents}), 0)::int`,
@@ -43,15 +45,22 @@ export async function getLeaderboard(
 		})
 		.from(rides)
 		.innerJoin(users, eq(users.id, rides.userId))
+		.leftJoin(companies, eq(companies.id, users.companyId))
 		.where(and(inArray(rides.userId, userIds), gte(rides.startedAt, start), lt(rides.startedAt, end)))
-		.groupBy(rides.userId, users.name, users.currency)) as LeaderEntry[];
+		.groupBy(rides.userId, users.name, companies.name, users.currency)) as LeaderEntry[];
 
 	const present = new Set(rows.map((r) => r.userId));
 	const missing = userIds.filter((id) => !present.has(id));
 	if (missing.length) {
 		const blanks = await db
-			.select({ userId: users.id, name: users.name, currency: users.currency })
+			.select({
+				userId: users.id,
+				name: users.name,
+				companyName: companies.name,
+				currency: users.currency
+			})
 			.from(users)
+			.leftJoin(companies, eq(companies.id, users.companyId))
 			.where(inArray(users.id, missing));
 		for (const b of blanks) {
 			rows.push({ ...b, distanceM: 0, earningsCents: 0, rideCount: 0 });

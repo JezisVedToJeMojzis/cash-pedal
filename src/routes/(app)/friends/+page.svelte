@@ -39,10 +39,13 @@
 		{#each data.incoming as r}
 			<div class="friend-row">
 				<div class="avatar-sm">{initial(r.otherName)}</div>
-				<span class="friend-name">
-					{r.otherName}
-					{#if r.coworker}<span class="badge">coworker</span>{/if}
-				</span>
+				<div class="friend-meta">
+					<div class="name-row">
+						<span class="name-text">{r.otherName}</span>
+						{#if r.coworker}<span class="badge">coworker</span>{/if}
+					</div>
+					{#if r.otherCompany}<div class="friend-sub muted">{r.otherCompany}</div>{/if}
+				</div>
 				<div class="btn-row" style="width:auto;gap:.4rem">
 					<form method="POST" action="?/accept" use:enhance>
 						<input type="hidden" name="id" value={r.id} />
@@ -65,11 +68,13 @@
 			<div class="friend-row">
 				<div class="avatar-sm">{initial(f.otherName)}</div>
 				<div class="friend-meta">
-					<div class="friend-name">
-						{f.otherName}
+					<div class="name-row">
+						<span class="name-text">{f.otherName}</span>
 						{#if f.coworker}<span class="badge">coworker</span>{/if}
 					</div>
-					<div class="friend-sub muted">Added {added(f.createdAt)}</div>
+					<div class="friend-sub muted">
+						{#if f.otherCompany}{f.otherCompany} · {/if}Added {added(f.createdAt)}
+					</div>
 				</div>
 				<button class="btn-ghost row-btn" onclick={() => openRemove(f.id, f.otherName)}>Remove</button>
 			</div>
@@ -81,10 +86,14 @@
 		{#each data.outgoing as r}
 			<div class="friend-row">
 				<div class="avatar-sm">{initial(r.otherName)}</div>
-				<span class="friend-name">
-					{r.otherName} <span class="badge">pending</span>
-					{#if r.coworker}<span class="badge">coworker</span>{/if}
-				</span>
+				<div class="friend-meta">
+					<div class="name-row">
+						<span class="name-text">{r.otherName}</span>
+						<span class="badge">pending</span>
+						{#if r.coworker}<span class="badge">coworker</span>{/if}
+					</div>
+					{#if r.otherCompany}<div class="friend-sub muted">{r.otherCompany}</div>{/if}
+				</div>
 				<form method="POST" action="?/remove" use:enhance>
 					<input type="hidden" name="id" value={r.id} />
 					<button type="submit" class="btn-ghost row-btn">Cancel</button>
@@ -138,21 +147,33 @@
 		flex: 1;
 		min-width: 0;
 	}
-	.friend-name {
-		flex: 1;
+	.name-row {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
 		min-width: 0;
+	}
+	.name-text {
 		font-weight: 600;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+		min-width: 0;
+	}
+	.name-row .badge {
+		flex-shrink: 0;
 	}
 	.friend-sub {
 		font-size: 0.78rem;
-		margin-top: 0.1rem;
+		margin-top: 0.15rem;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 	.row-btn {
 		width: auto;
 		padding: 0.45rem 0.85rem;
 		font-size: 0.85rem;
+		flex-shrink: 0;
 	}
 </style>

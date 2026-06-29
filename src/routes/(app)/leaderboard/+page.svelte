@@ -77,7 +77,8 @@
 							{/if}
 						</div>
 						<div class="muted" style="font-size:.8rem">
-							{entry.rideCount} ride{entry.rideCount === 1 ? '' : 's'}
+							{#if scope === 'friends' && entry.companyName}{entry.companyName} · {/if}{entry.rideCount}
+							ride{entry.rideCount === 1 ? '' : 's'}
 						</div>
 					</div>
 

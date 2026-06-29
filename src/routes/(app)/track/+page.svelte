@@ -2,16 +2,20 @@
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
 	import { computeEarningsCents, formatDistance, formatMoney, formatRate } from '$lib/format';
-	let { form } = $props();
+	let { data, form } = $props();
 
 	const user = $derived(page.data.user!);
-	const configured = $derived(
-		!!user.homeAddress && !!user.officeAddress && user.commuteDistanceM != null
-	);
+
+	const routeLabel = (r: { startLabel: string; endLabel: string }) =>
+		`${r.startLabel} ↔ ${r.endLabel}`;
+
+	let selectedId = $state(0);
+	$effect(() => {
+		if (!data.routes.some((r) => r.id === selectedId)) selectedId = data.routes[0]?.id ?? 0;
+	});
+	const selected = $derived(data.routes.find((r) => r.id === selectedId));
 	const perTrip = $derived(
-		user.commuteDistanceM != null
-			? computeEarningsCents(user.commuteDistanceM, user.rateCentsPerKm)
-			: 0
+		selected ? computeEarningsCents(selected.distanceM, user.rateCentsPerKm) : 0
 	);
 
 	const ymd = (d: Date) =>
@@ -26,28 +30,17 @@
 <div class="page">
 	<h1>Log a ride</h1>
 
-	{#if !configured}
+	{#if data.routes.length === 0}
 		<div class="card" style="text-align:center">
-			<p class="muted">Set your home and office addresses to log commutes with one tap.</p>
-			<a class="btn" href="/profile" style="margin-top:.5rem">Set up in Profile</a>
+			<p class="muted">Add a route (home, office, anywhere) to log rides with one tap.</p>
+			<a class="btn" href="/profile" style="margin-top:.5rem">Add a route in Profile</a>
 		</div>
 	{:else}
 		{#if form?.error}<p class="error">{form.error}</p>{/if}
 
-		<div class="card">
-			<div class="endpoint"><span class="pin">🏠</span> <span class="addr">{user.homeAddress}</span></div>
-			<div class="endpoint"><span class="pin">🏢</span> <span class="addr">{user.officeAddress}</span></div>
-			<div class="commute-stats">
-				<span><strong>{formatDistance(user.commuteDistanceM ?? 0)}</strong> each way</span>
-				<span class="muted">·</span>
-				<span style="color:var(--brand-bright);font-weight:700">{formatMoney(perTrip, user.currency)}</span>
-				<span class="muted">/ trip · {formatRate(user.rateCentsPerKm, user.currency)}</span>
-			</div>
-		</div>
-
 		<form
 			method="POST"
-			action="?/commute"
+			action="?/log"
 			use:enhance={() => {
 				submitting = true;
 				return async ({ update }) => {
@@ -56,24 +49,49 @@
 				};
 			}}
 		>
-			<label for="date" style="margin-top:1.25rem">Date</label>
-			<input id="date" name="date" type="date" value={todayStr} max={todayStr} />
+			<label for="route">Route</label>
+			<select id="route" name="routeId" bind:value={selectedId}>
+				{#each data.routes as r}
+					<option value={r.id}>{routeLabel(r)}</option>
+				{/each}
+			</select>
 
-			<div class="ride-buttons">
-				<button class="ride-btn" name="direction" value="to_office" disabled={submitting}>
-					<span class="ride-btn-main">🚲 Home → Office</span>
-					<span class="ride-btn-sub">Log {formatMoney(perTrip, user.currency)}</span>
-				</button>
-				<button class="ride-btn" name="direction" value="to_home" disabled={submitting}>
-					<span class="ride-btn-main">🚲 Office → Home</span>
-					<span class="ride-btn-sub">Log {formatMoney(perTrip, user.currency)}</span>
-				</button>
-			</div>
+			{#if selected}
+				<div class="card" style="margin:.3rem 0 1rem">
+					<div class="endpoint">
+						<span class="pin">🏠</span>
+						<span class="addr"><strong>{selected.startLabel}</strong> · {selected.startAddress}</span>
+					</div>
+					<div class="endpoint">
+						<span class="pin">🏢</span>
+						<span class="addr"><strong>{selected.endLabel}</strong> · {selected.endAddress}</span>
+					</div>
+					<div class="commute-stats">
+						<span><strong>{formatDistance(selected.distanceM)}</strong> each way</span>
+						<span class="muted">·</span>
+						<span style="color:var(--brand-bright);font-weight:700">{formatMoney(perTrip, user.currency)}</span>
+						<span class="muted">/ trip · {formatRate(user.rateCentsPerKm, user.currency)}</span>
+					</div>
+				</div>
+
+				<label for="date">Date</label>
+				<input id="date" name="date" type="date" value={todayStr} max={todayStr} />
+
+				<div class="ride-buttons">
+					<button class="ride-btn" name="direction" value="forward" disabled={submitting}>
+						<span class="ride-btn-main">🏠 {selected.startLabel} → 🏢 {selected.endLabel}</span>
+						<span class="ride-btn-sub">Log {formatMoney(perTrip, user.currency)}</span>
+					</button>
+					<button class="ride-btn" name="direction" value="reverse" disabled={submitting}>
+						<span class="ride-btn-main">🏢 {selected.endLabel} → 🏠 {selected.startLabel}</span>
+						<span class="ride-btn-sub">Log {formatMoney(perTrip, user.currency)}</span>
+					</button>
+				</div>
+			{/if}
 		</form>
 
 		<p class="muted" style="font-size:.8rem;margin-top:1rem;text-align:center">
-			Pick a past date if you forgot to log a ride. Manage addresses in
-			<a href="/profile">Profile</a>.
+			Pick a past date if you forgot to log a ride. Manage routes in <a href="/profile">Profile</a>.
 		</p>
 	{/if}
 </div>
@@ -118,7 +136,7 @@
 		padding: 1rem;
 	}
 	.ride-btn-main {
-		font-size: 1.05rem;
+		font-size: 1.02rem;
 		font-weight: 700;
 	}
 	.ride-btn-sub {

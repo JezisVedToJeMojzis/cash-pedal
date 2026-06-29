@@ -18,7 +18,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 			createdAt: friendships.createdAt,
 			otherId: sql<number>`${otherIdExpr}`,
 			otherName: sql<string>`(select name from users u where u.id = ${otherIdExpr})`,
-			otherCompanyId: sql<number | null>`(select company_id from users u where u.id = ${otherIdExpr})`
+			otherCompanyId: sql<number | null>`(select company_id from users u where u.id = ${otherIdExpr})`,
+			otherCompany: sql<string | null>`(select c.name from users u left join companies c on c.id = u.company_id where u.id = ${otherIdExpr})`
 		})
 		.from(friendships)
 		.where(or(eq(friendships.requesterId, me.id), eq(friendships.addresseeId, me.id)));

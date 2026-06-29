@@ -29,6 +29,20 @@
       "when": 1782673230367,
       "tag": "0003_fantastic_angel",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1782725180424,
+      "tag": "0004_chilly_bishop",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1782726420587,
+      "tag": "0005_bumpy_norrin_radd",
+      "breakpoints": true
     }
   ]
 }

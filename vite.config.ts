@@ -27,7 +27,7 @@ export default defineConfig({
 				name: 'CashPedal — Bike Commute Tracker',
 				short_name: 'CashPedal',
 				description: 'Track your bike commutes and the compensation you earn per kilometre.',
-				theme_color: '#16a34a',
+				theme_color: '#7c3aed',
 				background_color: '#0f172a',
 				display: 'standalone',
 				display_override: ['standalone'],

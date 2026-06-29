@@ -20,12 +20,38 @@
 		)
 	);
 
+	// Group the monthly totals under year headers (newest first).
+	type Month = (typeof data.monthly)[number];
+	const byYear = $derived.by(() => {
+		const groups = new Map<
+			string,
+			{ year: string; distanceM: number; earningsCents: number; months: Month[] }
+		>();
+		for (const m of data.monthly) {
+			const year = m.key.slice(0, 4);
+			let g = groups.get(year);
+			if (!g) {
+				g = { year, distanceM: 0, earningsCents: 0, months: [] };
+				groups.set(year, g);
+			}
+			g.distanceM += m.distanceM;
+			g.earningsCents += m.earningsCents;
+			g.months.push(m);
+		}
+		return [...groups.values()];
+	});
+
 	let showDelete = $state(false);
 	let pendingDeleteId = $state<number | null>(null);
 	let deleteForm: HTMLFormElement;
 	function openDelete(id: number) {
 		pendingDeleteId = id;
 		showDelete = true;
+	}
+
+	function monthName(key: string) {
+		const [y, m] = key.split('-').map(Number);
+		return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'long' });
 	}
 
 	function rideDate(d: string | Date) {
@@ -104,23 +130,29 @@
 				</div>
 			{/if}
 		{:else}
-			<!-- All months: combined totals per month -->
-			<div class="card">
-				{#each data.monthly as m}
-					<div class="list-row">
-						<div style="flex:1;min-width:0">
-							<div>
-								{monthLabel(m.key)}
-								{#if m.key === data.currentKey}<span class="badge">current</span>{/if}
+			<!-- All months: combined totals per month, grouped by year -->
+			{#each byYear as yr}
+				<div class="year-head">
+					<h2 style="margin:0">{yr.year}</h2>
+					<strong style="color:var(--brand-bright)">{formatMoney(yr.earningsCents, data.currency)}</strong>
+				</div>
+				<div class="card">
+					{#each yr.months as m}
+						<div class="list-row">
+							<div style="flex:1;min-width:0">
+								<div>
+									{monthName(m.key)}
+									{#if m.key === data.currentKey}<span class="badge">current</span>{/if}
+								</div>
+								<div class="muted" style="font-size:.8rem">
+									{formatDistance(m.distanceM)} · {m.rideCount} ride{m.rideCount === 1 ? '' : 's'}
+								</div>
 							</div>
-							<div class="muted" style="font-size:.8rem">
-								{formatDistance(m.distanceM)} · {m.rideCount} ride{m.rideCount === 1 ? '' : 's'}
-							</div>
+							<strong style="color:var(--brand-bright)">{formatMoney(m.earningsCents, data.currency)}</strong>
 						</div>
-						<strong style="color:var(--brand-bright)">{formatMoney(m.earningsCents, data.currency)}</strong>
-					</div>
-				{/each}
-			</div>
+					{/each}
+				</div>
+			{/each}
 		{/if}
 	{/if}
 </div>
@@ -148,6 +180,12 @@
 />
 
 <style>
+	.year-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		margin: 1.25rem 0 0.5rem;
+	}
 	.route {
 		font-size: 0.78rem;
 		overflow: hidden;

@@ -5,9 +5,9 @@
 	--border: #334155;
 	--text: #f1f5f9;
 	--text-muted: #94a3b8;
-	--brand: #16a34a;
-	--brand-bright: #22c55e;
-	--brand-dim: #15803d;
+	--brand: #7c3aed;
+	--brand-bright: #a78bfa;
+	--brand-dim: #6d28d9;
 	--danger: #ef4444;
 	--gold: #facc15;
 	--radius: 14px;
@@ -142,6 +142,14 @@ select {
 	background: var(--bg);
 	color: var(--text);
 	margin-bottom: 0.9rem;
+}
+
+/* Date inputs otherwise overflow their container on iOS/mobile. */
+input[type='date'] {
+	-webkit-appearance: none;
+	appearance: none;
+	min-width: 0;
+	max-width: 100%;
 }
 
 /* Custom dropdown chevron with breathing room on the right. */
