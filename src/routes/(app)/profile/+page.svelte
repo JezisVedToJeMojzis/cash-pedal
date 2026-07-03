@@ -112,6 +112,9 @@
 		<form method="POST" action="?/settings" use:enhance>
 			<label for="rate">Rate ({user.currency} per km)</label>
 			<input id="rate" name="rate" type="number" step="0.01" min="0" value={rateMajor} inputmode="decimal" />
+			<p class="muted" style="font-size:.8rem;margin:-.4rem 0 .9rem">
+				Set this to your own net figure — work it out for your tax situation, as it may be taxed as income.
+			</p>
 
 			<label for="currency">Currency</label>
 			<select id="currency" name="currency" value={user.currency}>
