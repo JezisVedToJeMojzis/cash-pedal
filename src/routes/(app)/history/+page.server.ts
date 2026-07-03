@@ -25,18 +25,24 @@ export const load: PageServerLoad = async ({ locals }) => {
 	// This month: each ride individually.
 	const currentRides = rows.filter((r) => monthKey(new Date(r.startedAt)) === currentKey);
 
-	// All months: combined totals per month (newest first).
-	const totals = new Map<string, { key: string; distanceM: number; earningsCents: number; rideCount: number }>();
+	// All months: combined totals per month (newest first), each keeping its
+	// individual rides so a past month can be expanded to edit/delete a ride.
+	type Row = (typeof rows)[number];
+	const totals = new Map<
+		string,
+		{ key: string; distanceM: number; earningsCents: number; rideCount: number; rides: Row[] }
+	>();
 	for (const r of rows) {
 		const key = monthKey(new Date(r.startedAt));
 		let m = totals.get(key);
 		if (!m) {
-			m = { key, distanceM: 0, earningsCents: 0, rideCount: 0 };
+			m = { key, distanceM: 0, earningsCents: 0, rideCount: 0, rides: [] };
 			totals.set(key, m);
 		}
 		m.distanceM += r.distanceM;
 		m.earningsCents += r.earningsCents;
 		m.rideCount += 1;
+		m.rides.push(r);
 	}
 
 	return {

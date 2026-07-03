@@ -49,6 +49,12 @@
 		showDelete = true;
 	}
 
+	// Which past months are expanded to show their individual rides.
+	let expanded = $state<Record<string, boolean>>({});
+	function toggleMonth(key: string) {
+		expanded[key] = !expanded[key];
+	}
+
 	function monthName(key: string) {
 		const [y, m] = key.split('-').map(Number);
 		return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'long' });
@@ -138,8 +144,11 @@
 				</div>
 				<div class="card">
 					{#each yr.months as m}
-						<div class="list-row">
-							<div style="flex:1;min-width:0">
+						<button type="button" class="month-row" onclick={() => toggleMonth(m.key)} aria-expanded={!!expanded[m.key]}>
+							<svg class="chev" class:open={expanded[m.key]} viewBox="0 0 24 24" width="16" height="16"
+								fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+								stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+							<div style="flex:1;min-width:0;text-align:left">
 								<div>
 									{monthName(m.key)}
 									{#if m.key === data.currentKey}<span class="badge">current</span>{/if}
@@ -149,7 +158,36 @@
 								</div>
 							</div>
 							<strong style="color:var(--brand-bright)">{formatMoney(m.earningsCents, data.currency)}</strong>
-						</div>
+						</button>
+						{#if expanded[m.key]}
+							<div class="month-rides">
+								{#each m.rides as ride}
+									<div class="list-row">
+										<div style="flex:1;min-width:0">
+											<div>{rideDate(ride.startedAt)} · <strong>{formatDistance(ride.distanceM)}</strong></div>
+											{#if ride.startPoint && ride.endPoint}
+												<div class="route muted" title="{ride.startPoint} → {ride.endPoint}">
+													{ride.startPoint} → {ride.endPoint}
+												</div>
+											{/if}
+										</div>
+										<strong>{formatMoney(ride.earningsCents, data.currency)}</strong>
+										<button
+											type="button"
+											class="del-btn"
+											aria-label="Delete ride"
+											title="Delete ride"
+											onclick={() => openDelete(ride.id)}
+										>
+											<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+												stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+												<path d="M4 7h16M10 11v6M14 11v6M5 7l1 13a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1l1-13M9 7V4h6v3" />
+											</svg>
+										</button>
+									</div>
+								{/each}
+							</div>
+						{/if}
 					{/each}
 				</div>
 			{/each}
@@ -185,6 +223,39 @@
 		justify-content: space-between;
 		align-items: baseline;
 		margin: 1.25rem 0 0.5rem;
+	}
+	.month-row {
+		width: 100%;
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		padding: 0.7rem 0;
+		background: transparent;
+		border: none;
+		color: inherit;
+		font: inherit;
+		text-align: left;
+		cursor: pointer;
+		border-bottom: 1px solid var(--border);
+	}
+	.month-row:last-child {
+		border-bottom: none;
+	}
+	.month-row:hover {
+		filter: none;
+	}
+	.chev {
+		flex-shrink: 0;
+		color: var(--text-muted);
+		transition: transform 0.15s ease;
+	}
+	.chev.open {
+		transform: rotate(90deg);
+	}
+	.month-rides {
+		margin: 0 0 0.4rem 1.6rem;
+		padding-left: 0.6rem;
+		border-left: 2px solid var(--border);
 	}
 	.route {
 		font-size: 0.78rem;
